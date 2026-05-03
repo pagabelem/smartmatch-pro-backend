@@ -31,47 +31,6 @@ from app.dependencies import get_db
 from app.main import app
 from app.modules.users.user_model import Profile, User
 
-# ── In-memory SQLite — used for all ORM tests ─────────────────────────────────
-# PostgreSQL-specific types (JSONB, UUID…) are not used at model level so SQLite
-# handles them transparently for testing purposes.
-_TEST_URL = "sqlite:///:memory:"
-_test_engine = create_engine(_TEST_URL, connect_args={"check_same_thread": False})
-_TestSession = sessionmaker(bind=_test_engine, autocommit=False, autoflush=False,
-                            expire_on_commit=False)
-
-
-@pytest.fixture(autouse=True)
-def _reset_db():
-    """Recreate all tables before each test, drop them after."""
-    Base.metadata.create_all(bind=_test_engine)
-    yield
-    Base.metadata.drop_all(bind=_test_engine)
-
-
-@pytest.fixture
-def db():
-    session = _TestSession()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-@pytest.fixture
-def client(db):
-    """FastAPI TestClient wired to the in-memory DB."""
-    def _override():
-        try:
-            yield db
-        finally:
-            pass
-
-    app.dependency_overrides[get_db] = _override
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
-
-
 # ── Config: DATABASE_URL assembly ─────────────────────────────────────────────
 class TestPostgresConfig:
     def test_url_assembled_from_fields(self, monkeypatch):

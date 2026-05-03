@@ -1,29 +1,84 @@
+# tests/conftest.py
 """
-conftest.py — Shared pytest fixtures and test configuration.
+conftest.py — Shared pytest fixtures for all test phases.
 
-Key fixture: override_db_check
-    The lifespan in main.py calls check_db_connection() at startup.
-    In tests there is no real PostgreSQL running, so we mock it to return True.
-    This lets TestClient start the app without a live database.
-
-    All actual database operations in tests use the in-memory SQLite engine
-    defined in test_phase0.py — completely isolated from production.
+Architecture
+------------
+- Un seul moteur SQLite en mémoire partagé par tous les fichiers de tests.
+- reset_tables (autouse) recrée les tables avant chaque test.
+- db et client sont disponibles pour test_phase0, test_phase1, etc.
+- get_db est overridé globalement → les routes HTTP utilisent SQLite, pas PostgreSQL.
 """
 
 from unittest.mock import patch
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+
+from app.database import Base
+from app.dependencies import get_db
+from app.main import app
+
+# ── Moteur SQLite partagé ─────────────────────────────────────────────────────
+TEST_ENGINE = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+)
+
+# FK enforcement sur SQLite (désactivé par défaut)
+@event.listens_for(TEST_ENGINE, "connect")
+def _set_sqlite_pragma(dbapi_connection, _):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+TestingSessionLocal = sessionmaker(
+    bind=TEST_ENGINE,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+)
+
+
+# ── Fixtures autouse ──────────────────────────────────────────────────────────
+@pytest.fixture(autouse=True)
+def override_db_check():
+    """Empêche le lifespan de crasher en l'absence de PostgreSQL."""
+    with patch("app.main.check_db_connection", return_value=True):
+        yield
 
 
 @pytest.fixture(autouse=True)
-def override_db_check():
-    """
-    Mock check_db_connection() → True for the entire test session.
+def reset_tables():
+    """Recrée toutes les tables avant chaque test, les supprime après."""
+    Base.metadata.create_all(bind=TEST_ENGINE)
+    yield
+    Base.metadata.drop_all(bind=TEST_ENGINE)
 
-    Without this, the FastAPI lifespan raises RuntimeError when it cannot
-    reach PostgreSQL, causing all TestClient fixtures to fail at setup.
 
-    autouse=True means this fixture runs for EVERY test automatically.
+# ── Fixtures partagées ────────────────────────────────────────────────────────
+@pytest.fixture
+def db():
+    """Session SQLite injectée dans les tests ORM."""
+    session = TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def client(db):
     """
-    with patch("app.main.check_db_connection", return_value=True):
-        yield
+    TestClient avec get_db overridé vers SQLite.
+    La MÊME session que db est injectée dans les routes HTTP.
+    """
+    def _override():
+        yield db
+
+    app.dependency_overrides[get_db] = _override
+    with TestClient(app, raise_server_exceptions=True) as c:
+        yield c
+    app.dependency_overrides.clear()
