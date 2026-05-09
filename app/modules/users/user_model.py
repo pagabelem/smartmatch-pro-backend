@@ -18,6 +18,9 @@ Relationships
 """
 
 from datetime import datetime, timezone
+# app/modules/users/user_model.py
+
+
 
 from sqlalchemy import (
     Boolean,

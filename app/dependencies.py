@@ -85,3 +85,59 @@ def get_current_active_user(current_user=Depends(get_current_user)):
             detail="Inactive user account.",
         )
     return current_user
+
+
+"""
+dependencies.py — FastAPI dependency functions.
+
+Phase 1 update: get_current_user now performs real JWT validation
+using auth_service.get_current_user_from_token().
+"""
+
+from typing import Generator
+
+from fastapi import Depends, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
+
+from app.core.exceptions import InvalidTokenException
+from app.database import SessionLocal
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+
+def get_db() -> Generator[Session, None, None]:
+    """Yield a SQLAlchemy Session, close it after the request."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def get_current_user(
+    db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+):
+    """
+    Decode the JWT access token and return the authenticated User.
+
+    Raises HTTP 401 if the token is invalid, expired, or the user no longer exists.
+    """
+    from app.modules.auth.auth_service import get_current_user_from_token
+    return get_current_user_from_token(db, token)
+
+
+def get_current_active_user(current_user=Depends(get_current_user)):
+    """Same as get_current_user but also enforces is_active=True."""
+    if not getattr(current_user, "is_active", True):
+        raise InvalidTokenException("Account is deactivated.")
+    return current_user
+
+
+def get_current_superuser(current_user=Depends(get_current_user)):
+    """Restrict endpoint to superusers (admins)."""
+    from app.core.exceptions import ForbiddenException
+    if not getattr(current_user, "is_superuser", False):
+        raise ForbiddenException("Superuser access required.")
+    return current_user
