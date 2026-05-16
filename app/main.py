@@ -1,19 +1,141 @@
+# app/main.py
+"""
+main.py — FastAPI application entry point.
+
+Run with:
+    uvicorn app.main:app --reload
+
+Swagger UI:   http://localhost:8000/docs
+ReDoc:        http://localhost:8000/redoc
+OpenAPI JSON: http://localhost:8000/openapi.json
+"""
+
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
-app = FastAPI(
-    title="SmartMatch Pro API",
-    description="Backend intelligent pour analyse d'offres, matching et recommandation",
-    version="1.0.0"
+from app.config import settings
+from app.database import check_db_connection
+
+# ── Import tous les modèles (requis pour Alembic autogenerate) ────────────────
+from app.modules.users.user_model import Profile, User          # noqa: F401
+from app.modules.skills.skill_model import Skill                # noqa: F401
+
+# ── Import des routers ────────────────────────────────────────────────────────
+# from app.modules.auth.auth_router        import router as auth_router
+# from app.modules.users.user_router       import router as users_router
+# from app.modules.profiles.profile_router import router as profiles_router
+# from app.modules.resumes.resume_router   import router as resumes_router
+# from app.modules.nlp.nlp_router          import router as nlp_router
+
+from app.modules.skills.skill_router import router as skills_router       # ✅
+
+# from app.modules.matching.matching_router   import router as matching_router
+# from app.modules.skill_gap.skill_gap_router import router as skill_gap_router
+# from app.modules.favorites.favorite_router  import router as favorites_router
+# from app.modules.dashboard.dashboard_router import router as dashboard_router
+# from app.modules.ai.ai_router               import router as ai_router
+
+API_PREFIX = "/api/v1"
+
+
+# ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    print(f"🚀  Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    print(f"    Environment : {settings.ENVIRONMENT}")
+    print(f"    Database    : {settings.DATABASE_URL}")
+    print(f"    Debug mode  : {settings.DEBUG}")
+
+    if not check_db_connection():
+        raise RuntimeError(
+            f"Cannot connect to database: {settings.DATABASE_URL}\n"
+            "Run 'alembic upgrade head' to create the tables."
+        )
+    print("    Database    : ✓ connection OK")
+
+    yield
+
+    print(f"🛑  Shutting down {settings.APP_NAME}")
+
+
+# ── App factory ───────────────────────────────────────────────────────────────
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=settings.APP_NAME,
+        version=settings.APP_VERSION,
+        description=(
+            "**SmartMatch Pro** — Intelligent Job Recommendation & Career Assistant.\n\n"
+            "Authenticate via `/api/v1/auth/login` to get a JWT bearer token, "
+            "then click **Authorize** to access protected endpoints."
+        ),
+        lifespan=lifespan,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+    )
+
+    # ── Middlewares ────────────────────────────────────────────────────────────
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.allowed_origins_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    if settings.ENVIRONMENT == "production":
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=["yourdomain.com", "www.yourdomain.com"],
+        )
+
+    # ── Routers ───────────────────────────────────────────────────────────────
+    # app.include_router(auth_router,      prefix=API_PREFIX)
+    # app.include_router(users_router,     prefix=API_PREFIX)
+    # app.include_router(profiles_router,  prefix=API_PREFIX)
+    # app.include_router(resumes_router,   prefix=API_PREFIX)
+    # app.include_router(nlp_router,       prefix=API_PREFIX)
+
+    app.include_router(skills_router,    prefix=API_PREFIX)               # ✅
+
+    # app.include_router(matching_router,  prefix=API_PREFIX)
+    # app.include_router(skill_gap_router, prefix=API_PREFIX)
+    # app.include_router(favorites_router, prefix=API_PREFIX)
+    # app.include_router(dashboard_router, prefix=API_PREFIX)
+    # app.include_router(ai_router,        prefix=API_PREFIX)
+
+    return app
+
+
+# ── Instance de l'application ─────────────────────────────────────────────────
+app = create_app()
+
+
+# ── Health check ──────────────────────────────────────────────────────────────
+@app.get(
+    "/health",
+    tags=["System"],
+    summary="Health check",
 )
+def health_check() -> JSONResponse:
+    db_ok = check_db_connection()
+    payload = {
+        "status":      "healthy" if db_ok else "degraded",
+        "app":         settings.APP_NAME,
+        "version":     settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+        "database":    "connected" if db_ok else "unreachable",
+    }
+    return JSONResponse(content=payload, status_code=200 if db_ok else 503)
 
-@app.get("/")
+
+# ── Root redirect ─────────────────────────────────────────────────────────────
+@app.get("/", include_in_schema=False)
 def root():
-    return {
-        "message": "SmartMatch Pro Backend is running"
-    }
-
-@app.get("/health")
-def health_check():
-    return {
-        "status": "ok"
-    }
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")
