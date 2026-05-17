@@ -43,6 +43,7 @@ from app.modules.users.user_model import Profile, User  # noqa: F401, E402
 # from app.modules.resumes.resume_model   import Resume        # Phase 4
 from app.modules.skills.skill_model     import Skill         # Phase 5 dep.
 from app.modules.jobs.job_model         import Job           # Membre 2
+from app.modules.imports.import_model import Import  # noqa: F401, E402
 # from app.modules.matching.recommendation_model import Recommendation
 # from app.modules.skill_gap.skill_gap_model import SkillGapResult
 # from app.modules.favorites.favorite_model import Favorite
