@@ -1,14 +1,4 @@
 # app/main.py
-"""
-main.py — FastAPI application entry point.
-
-Run with:
-    uvicorn app.main:app --reload
-
-Swagger UI:   http://localhost:8000/docs
-ReDoc:        http://localhost:8000/redoc
-OpenAPI JSON: http://localhost:8000/openapi.json
-"""
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -21,9 +11,10 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.database import check_db_connection
 
-# ── Import tous les modèles (requis pour Alembic autogenerate) ────────────────
+# ── Import tous les modèles ────────────────────────────────────────────────────
 from app.modules.users.user_model import Profile, User          # noqa: F401
 from app.modules.skills.skill_model import Skill                # noqa: F401
+from app.modules.jobs.job_model import Job                      # noqa: F401
 
 # ── Import des routers ────────────────────────────────────────────────────────
 # from app.modules.auth.auth_router        import router as auth_router
@@ -32,7 +23,8 @@ from app.modules.skills.skill_model import Skill                # noqa: F401
 # from app.modules.resumes.resume_router   import router as resumes_router
 # from app.modules.nlp.nlp_router          import router as nlp_router
 
-from app.modules.skills.skill_router import router as skills_router       # ✅
+from app.modules.skills.skill_router import router as skills_router
+from app.modules.jobs.job_router     import router as jobs_router
 
 # from app.modules.matching.matching_router   import router as matching_router
 # from app.modules.skill_gap.skill_gap_router import router as skill_gap_router
@@ -43,27 +35,22 @@ from app.modules.skills.skill_router import router as skills_router       # ✅
 API_PREFIX = "/api/v1"
 
 
-# ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print(f"🚀  Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     print(f"    Environment : {settings.ENVIRONMENT}")
     print(f"    Database    : {settings.DATABASE_URL}")
     print(f"    Debug mode  : {settings.DEBUG}")
-
     if not check_db_connection():
         raise RuntimeError(
             f"Cannot connect to database: {settings.DATABASE_URL}\n"
             "Run 'alembic upgrade head' to create the tables."
         )
     print("    Database    : ✓ connection OK")
-
     yield
-
     print(f"🛑  Shutting down {settings.APP_NAME}")
 
 
-# ── App factory ───────────────────────────────────────────────────────────────
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
@@ -79,7 +66,6 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
 
-    # ── Middlewares ────────────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins_list,
@@ -94,14 +80,9 @@ def create_app() -> FastAPI:
             allowed_hosts=["yourdomain.com", "www.yourdomain.com"],
         )
 
-    # ── Routers ───────────────────────────────────────────────────────────────
-    # app.include_router(auth_router,      prefix=API_PREFIX)
-    # app.include_router(users_router,     prefix=API_PREFIX)
-    # app.include_router(profiles_router,  prefix=API_PREFIX)
-    # app.include_router(resumes_router,   prefix=API_PREFIX)
-    # app.include_router(nlp_router,       prefix=API_PREFIX)
-
-    app.include_router(skills_router,    prefix=API_PREFIX)               # ✅
+    # ── Routers ────────────────────────────────────────────────────────────────
+    app.include_router(skills_router, prefix=API_PREFIX)
+    app.include_router(jobs_router,   prefix=API_PREFIX)
 
     # app.include_router(matching_router,  prefix=API_PREFIX)
     # app.include_router(skill_gap_router, prefix=API_PREFIX)
@@ -112,16 +93,10 @@ def create_app() -> FastAPI:
     return app
 
 
-# ── Instance de l'application ─────────────────────────────────────────────────
 app = create_app()
 
 
-# ── Health check ──────────────────────────────────────────────────────────────
-@app.get(
-    "/health",
-    tags=["System"],
-    summary="Health check",
-)
+@app.get("/health", tags=["System"], summary="Health check")
 def health_check() -> JSONResponse:
     db_ok = check_db_connection()
     payload = {
@@ -134,7 +109,6 @@ def health_check() -> JSONResponse:
     return JSONResponse(content=payload, status_code=200 if db_ok else 503)
 
 
-# ── Root redirect ─────────────────────────────────────────────────────────────
 @app.get("/", include_in_schema=False)
 def root():
     from fastapi.responses import RedirectResponse
