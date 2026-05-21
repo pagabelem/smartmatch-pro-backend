@@ -36,7 +36,7 @@ from app.modules.auth.auth_router import router as auth_router
 from app.modules.skills.skill_router import router as skills_router
 
 # Routers des phases suivantes (à décommenter au fur et à mesure)
-# from app.modules.users.user_router import router as users_router       # Phase 2
+from app.modules.users.user_router import router as users_router       # Phase 2 - DÉCOMMENTÉ
 # from app.modules.profiles.profile_router import router as profiles_router # Phase 3
 # from app.modules.resumes.resume_router import router as resumes_router   # Phase 4
 # from app.modules.nlp.nlp_router import router as nlp_router            # Phase 5
@@ -117,7 +117,7 @@ def create_app() -> FastAPI:
     app.include_router(skills_router, prefix=f"{API_PREFIX}", tags=["Skills"])
     
     # Phase 2+ (Un-comment as you implement)
-    # app.include_router(users_router, prefix=f"{API_PREFIX}/users", tags=["Users"])
+    app.include_router(users_router, prefix=f"{API_PREFIX}/users", tags=["Users"])  # DÉCOMMENTÉ
 
     return app
 
