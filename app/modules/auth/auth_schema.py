@@ -9,6 +9,7 @@ Schemas defined here
   RefreshRequest    → POST /auth/refresh   (input)
   MessageResponse   → POST /auth/logout    (output)
   UserPublic        → embedded in TokenResponse
+  ChangePasswordRequest → POST /auth/change-password (input)
 """
 
 from datetime import datetime
@@ -74,6 +75,28 @@ class RefreshRequest(BaseModel):
         ...,
         description="The refresh token received at login.",
     )
+
+
+class ChangePasswordRequest(BaseModel):
+    """Payload for POST /auth/change-password."""
+
+    old_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="Current password.",
+    )
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="New password (min 8 chars, 1 uppercase, 1 lowercase, 1 digit).",
+    )
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_must_be_strong(cls, v: str) -> str:
+        return validate_password_strength(v)
 
 
 # ── Output schemas ────────────────────────────────────────────────────────────

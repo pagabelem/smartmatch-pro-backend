@@ -11,7 +11,7 @@ from app.modules.users.user_schema import (
 from app.modules.users.user_service import UserService
 
 
-router = APIRouter(tags=["users"])
+router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get("/", response_model=UserListResponse)

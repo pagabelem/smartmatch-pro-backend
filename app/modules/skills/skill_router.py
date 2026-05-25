@@ -36,7 +36,6 @@ from app.shared.pagination import PaginationParams
 router = APIRouter(prefix="/skills", tags=["Skills"])
 
 
-# ── POST / — Create skill ─────────────────────────────────────────────────────
 @router.post(
     "/",
     status_code=status.HTTP_201_CREATED,
@@ -47,13 +46,12 @@ router = APIRouter(prefix="/skills", tags=["Skills"])
 def create_skill(
     payload: SkillCreate,
     db: Session = Depends(get_db),
-    _=Depends(get_current_active_user),   # auth required
+    _=Depends(get_current_active_user),
 ):
     skill = skill_service.create_skill(db, payload)
     return created(data=SkillResponse.model_validate(skill), message="Skill created.")
 
 
-# ── GET / — List skills ───────────────────────────────────────────────────────
 @router.get(
     "/",
     response_model=SkillListResponse,
@@ -65,10 +63,10 @@ def create_skill(
 )
 def list_skills(
     params: PaginationParams = Depends(),
-    search:     str | None = Query(default=None, description="Filter by name fragment."),
-    category:   str | None = Query(default=None, description="Filter by SkillCategory value."),
+    search: str | None = Query(default=None, description="Filter by name fragment."),
+    category: str | None = Query(default=None, description="Filter by SkillCategory value."),
     skill_type: str | None = Query(default=None, description="'hard' or 'soft'."),
-    sort:       str        = Query(default="name", description="'name' or 'created_at'."),
+    sort: str = Query(default="name", description="'name' or 'created_at'."),
     db: Session = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
@@ -87,7 +85,6 @@ def list_skills(
     )
 
 
-# ── GET /{id} — Get single skill ──────────────────────────────────────────────
 @router.get(
     "/{skill_id}",
     response_model=SkillResponse,
@@ -102,7 +99,6 @@ def get_skill(
     return ok(data=SkillResponse.model_validate(skill))
 
 
-# ── PUT /{id} — Update skill ──────────────────────────────────────────────────
 @router.put(
     "/{skill_id}",
     response_model=SkillResponse,
@@ -119,7 +115,6 @@ def update_skill(
     return ok(data=SkillResponse.model_validate(skill), message="Skill updated.")
 
 
-# ── DELETE /{id} — Delete skill ───────────────────────────────────────────────
 @router.delete(
     "/{skill_id}",
     status_code=status.HTTP_204_NO_CONTENT,

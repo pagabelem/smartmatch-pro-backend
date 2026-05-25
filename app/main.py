@@ -35,12 +35,9 @@ from app.modules.skills.skill_model import Skill            # noqa: F401
 from app.modules.auth.auth_router import router as auth_router
 from app.modules.skills.skill_router import router as skills_router
 
-# Routers des phases suivantes (à décommenter au fur et à mesure)
-from app.modules.users.user_router import router as users_router       # Phase 2 - DÉCOMMENTÉ
-# from app.modules.profiles.profile_router import router as profiles_router # Phase 3
-# from app.modules.resumes.resume_router import router as resumes_router   # Phase 4
-# from app.modules.nlp.nlp_router import router as nlp_router            # Phase 5
-# from app.modules.matching.matching_router import router as matching_router # Phase 6
+# Routers des phases suivantes
+from app.modules.users.user_router import router as users_router
+from app.modules.profiles.profile_router import router as profiles_router
 
 API_PREFIX = "/api/v1"
 
@@ -112,12 +109,13 @@ def create_app() -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────────
     
-    # Phase 1: Authentication & Skills
-    app.include_router(auth_router, prefix=f"{API_PREFIX}/auth", tags=["Authentication"])
-    app.include_router(skills_router, prefix=f"{API_PREFIX}", tags=["Skills"])
+    # Chaque routeur a déjà son propre préfixe interne (ex: "/auth", "/users", etc.)
+    # On ne met donc PAS de préfixe supplémentaire ici
     
-    # Phase 2+ (Un-comment as you implement)
-    app.include_router(users_router, prefix=f"{API_PREFIX}/users", tags=["Users"])  # DÉCOMMENTÉ
+    app.include_router(auth_router, prefix=API_PREFIX, tags=["Authentication"])
+    app.include_router(skills_router, prefix=API_PREFIX, tags=["Skills"])
+    app.include_router(users_router, prefix=API_PREFIX, tags=["Users"])
+    app.include_router(profiles_router, prefix=API_PREFIX, tags=["Profiles"])
 
     return app
 
@@ -154,3 +152,5 @@ def health_check() -> JSONResponse:
 def root():
     """Redirect browsers hitting the root URL to the API docs."""
     return RedirectResponse(url="/docs")
+
+

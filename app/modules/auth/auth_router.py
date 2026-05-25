@@ -1,119 +1,113 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
-from app.core.responses import created, ok
-from app.dependencies import get_current_active_user, get_db
-from app.modules.auth import auth_service
+from app.dependencies import get_db
 from app.modules.auth.auth_schema import (
-    LoginRequest,
-    MessageResponse,
-    RefreshRequest,
-    RegisterRequest,
-    TokenResponse,
-    UserPublic,
+    RegisterRequest, 
+    LoginRequest, 
+    ChangePasswordRequest,
 )
-
-router = APIRouter()
-
-# ── POST /register ────────────────────────────────────────────────────────────
-@router.post(
-    "/register",
-    status_code=status.HTTP_201_CREATED,
-    response_model=TokenResponse,
-    summary="Register a new account",
+from app.modules.auth.auth_service import (
+    register, login, refresh, logout, logout_all, 
+    get_current_user_from_token, change_password
 )
-def register(
+from app.core.responses import success_response, ok, error_response
+from app.core.exceptions import InvalidCredentialsException, EmailAlreadyExistsException, InvalidTokenException
+
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+def register_user(
     payload: RegisterRequest,
     request: Request,
     db: Session = Depends(get_db),
-) -> TokenResponse:
-    result = auth_service.register(
-        db=db,
-        payload=payload,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-    )
-    # Plus besoin de model_dump() manuel, le helper s'en charge via jsonable_encoder
-    return created(data=result, message="Account created successfully.")
+):
+    try:
+        result = register(
+            db=db,
+            payload=payload,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=request.client.host if request.client else None,
+        )
+        return success_response(data=result, message="Account created successfully.")
+    except EmailAlreadyExistsException as e:
+        return error_response(message=str(e), code="EMAIL_EXISTS"), status.HTTP_409_CONFLICT
 
 
-# ── POST /login ───────────────────────────────────────────────────────────────
-@router.post(
-    "/login",
-    response_model=TokenResponse,
-    summary="Login with email and password",
-)
-def login(
+@router.post("/login")
+def login_user(
     payload: LoginRequest,
     request: Request,
     db: Session = Depends(get_db),
-) -> TokenResponse:
-    result = auth_service.login(
-        db=db,
-        payload=payload,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-    )
-    return ok(data=result, message="Login successful.")
+):
+    try:
+        result = login(
+            db=db,
+            payload=payload,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=request.client.host if request.client else None,
+        )
+        return success_response(data=result, message="Login successful.")
+    except InvalidCredentialsException as e:
+        return error_response(message=str(e), code="INVALID_CREDENTIALS"), status.HTTP_401_UNAUTHORIZED
 
 
-# ── POST /refresh ─────────────────────────────────────────────────────────────
-@router.post(
-    "/refresh",
-    response_model=TokenResponse,
-    summary="Refresh token pair",
-)
-def refresh(
-    payload: RefreshRequest,
+@router.post("/refresh")
+def refresh_token(
+    refresh_token: str,
     request: Request,
     db: Session = Depends(get_db),
-) -> TokenResponse:
-    result = auth_service.refresh(
-        db=db,
-        refresh_token_str=payload.refresh_token,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-    )
-    return ok(data=result, message="Token refreshed.")
+):
+    try:
+        result = refresh(
+            db=db,
+            refresh_token_str=refresh_token,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=request.client.host if request.client else None,
+        )
+        return success_response(data=result, message="Token refreshed.")
+    except InvalidTokenException as e:
+        return error_response(message=str(e), code="INVALID_TOKEN"), status.HTTP_401_UNAUTHORIZED
 
 
-# ── POST /logout ──────────────────────────────────────────────────────────────
-@router.post(
-    "/logout",
-    response_model=MessageResponse,
-    summary="Logout current device",
-)
-def logout(
-    payload: RefreshRequest,
+@router.post("/logout")
+def logout_user(
+    refresh_token: str,
     db: Session = Depends(get_db),
-) -> MessageResponse:
-    auth_service.logout(db=db, refresh_token_str=payload.refresh_token)
+):
+    logout(db=db, refresh_token_str=refresh_token)
     return ok(message="Logged out successfully.")
 
 
-# ── POST /logout-all ──────────────────────────────────────────────────────────
-@router.post(
-    "/logout-all",
-    response_model=MessageResponse,
-    summary="Logout all devices",
-)
-def logout_all(
+@router.get("/me")
+def get_current_user_info(
+    request: Request,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_user),
-) -> MessageResponse:
-    auth_service.logout_all(db=db, user_id=current_user.id)
-    return ok(message="All sessions have been revoked.")
+):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return error_response(message="Missing token", code="UNAUTHORIZED"), status.HTTP_401_UNAUTHORIZED
+    token = auth_header.split(" ")[1]
+    current_user = get_current_user_from_token(db, token)
+    return success_response(data=current_user)
 
 
-# ── GET /me ───────────────────────────────────────────────────────────────────
-@router.get(
-    "/me",
-    response_model=UserPublic,
-    summary="Get current authenticated user",
-)
-def me(
-    current_user=Depends(get_current_active_user),
-) -> UserPublic:
-    # On convertit le modèle SQLAlchemy en schéma Pydantic pour filtrer les champs
-    user_data = UserPublic.model_validate(current_user)
-    return ok(data=user_data)
+@router.post("/change-password")
+def change_user_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return error_response(message="Missing token", code="UNAUTHORIZED"), status.HTTP_401_UNAUTHORIZED
+    token = auth_header.split(" ")[1]
+    current_user = get_current_user_from_token(db, token)
+    result = change_password(
+        db=db,
+        user=current_user,
+        old_password=payload.old_password,
+        new_password=payload.new_password,
+    )
+    return success_response(data=result, message="Password changed successfully.")

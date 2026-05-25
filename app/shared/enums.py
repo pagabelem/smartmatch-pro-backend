@@ -44,6 +44,23 @@ class AccountStatus(str, Enum):
     BANNED    = "banned"
 
 
+# ── Profile & Education ───────────────────────────────────────────────────────
+class ProfileStatus(str, Enum):
+    """Profile completion status."""
+    DRAFT = "draft"
+    COMPLETED = "completed"
+    VERIFIED = "verified"
+
+
+class EducationLevel(str, Enum):
+    """Education level options."""
+    BACHELOR = "bachelor"
+    MASTER = "master"
+    PHD = "phd"
+    ENGINEERING = "engineering"
+    OTHER = "other"
+
+
 # ── Job offers ────────────────────────────────────────────────────────────────
 class ContractType(str, Enum):
     """Type of employment contract."""
@@ -83,20 +100,6 @@ class WorkMode(str, Enum):
     ANY      = "any"
 
 
-# ── Education ─────────────────────────────────────────────────────────────────
-class DegreeLevel(str, Enum):
-    """
-    Education level required or attained.
-    Aligned with the French/Moroccan system used in SmartMatch's primary market.
-    """
-    BAC          = "Bac"
-    BAC_PLUS_2   = "Bac+2"
-    BAC_PLUS_3   = "Bac+3"   # Licence / Bachelor
-    BAC_PLUS_5   = "Bac+5"   # Master / Ingénieur
-    DOCTORAT     = "Doctorat"
-    ANY          = "Any"      # not specified by the employer
-
-
 # ── Skills ────────────────────────────────────────────────────────────────────
 class SkillType(str, Enum):
     """Broad category of a skill."""
@@ -107,20 +110,19 @@ class SkillType(str, Enum):
 class SkillCategory(str, Enum):
     """
     Sub-domain of a hard skill — used by the treemap / dashboard visualisation.
-    Maps to the stacked-bar chart defined in the pedagogical dashboard (Section 3bis).
     """
-    PROGRAMMING  = "programming"   # Python, Java, C, C++, Scala
-    AI_ML        = "ai_ml"         # scikit-learn, PyTorch, TensorFlow, XGBoost
-    NLP          = "nlp"           # spaCy, NLTK, Hugging Face, BERT
-    WEB_FRONTEND = "web_frontend"  # React, Angular, Vue, HTML, JavaScript
-    WEB_BACKEND  = "web_backend"   # JEE, Spring, Django, FastAPI, Laravel
-    BIG_DATA     = "big_data"      # Spark, Hadoop, Kafka, Hive
-    DATABASE     = "database"      # SQL, PostgreSQL, MongoDB, Redis
-    DEVOPS       = "devops"        # Docker, Kubernetes, Git, CI/CD, AWS
-    DATA_VIZ     = "data_viz"      # Power BI, Tableau, Plotly, Matplotlib
-    SECURITY     = "security"      # OWASP, pen-testing, cryptography
-    MANAGEMENT   = "management"    # project management, agile, scrum
-    SOFT_SKILL   = "soft_skill"    # communication, leadership, teamwork
+    PROGRAMMING  = "programming"
+    AI_ML        = "ai_ml"
+    NLP          = "nlp"
+    WEB_FRONTEND = "web_frontend"
+    WEB_BACKEND  = "web_backend"
+    BIG_DATA     = "big_data"
+    DATABASE     = "database"
+    DEVOPS       = "devops"
+    DATA_VIZ     = "data_viz"
+    SECURITY     = "security"
+    MANAGEMENT   = "management"
+    SOFT_SKILL   = "soft_skill"
     OTHER        = "other"
 
 
@@ -129,7 +131,7 @@ class Language(str, Enum):
     """Languages supported by the NLP pipeline in V1."""
     FRENCH  = "fr"
     ENGLISH = "en"
-    UNKNOWN = "unknown"   # detected but not supported → offer is flagged
+    UNKNOWN = "unknown"
 
 
 # ── Import / Data sources ─────────────────────────────────────────────────────
@@ -154,10 +156,7 @@ class ImportStatus(str, Enum):
 
 # ── Salary ────────────────────────────────────────────────────────────────────
 class SalaryBracket(str, Enum):
-    """
-    Salary range brackets used by the pedagogical dashboard filter.
-    Values in Moroccan Dirhams (DH) — extend for other currencies in V2.
-    """
+    """Salary range brackets."""
     UNDER_5K    = "< 5 000 DH"
     FROM_5K_10K = "5 000 – 10 000 DH"
     FROM_10K_20K = "10 000 – 20 000 DH"
@@ -167,10 +166,7 @@ class SalaryBracket(str, Enum):
 
 # ── Matching ──────────────────────────────────────────────────────────────────
 class MatchScoreLabel(str, Enum):
-    """
-    Human-readable label for a match score range.
-    Displayed as a badge on each recommendation card.
-    """
+    """Human-readable label for a match score range."""
     EXCELLENT  = "Excellent"   # ≥ 80 %
     GOOD       = "Good"        # 60 – 79 %
     AVERAGE    = "Average"     # 40 – 59 %
@@ -186,3 +182,58 @@ class MatchScoreLabel(str, Enum):
         if score >= 40:
             return cls.AVERAGE
         return cls.LOW
+
+
+# ── Favorites ─────────────────────────────────────────────────────────────────
+class FavoriteStatus(str, Enum):
+    """Status of a favorite job."""
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+class NotificationType(str, Enum):
+    """Type of notification."""
+    JOB_MATCH = "job_match"
+    SKILL_GAP = "skill_gap"
+    SYSTEM = "system"
+    REMINDER = "reminder"
+
+
+# ── Gender ────────────────────────────────────────────────────────────────────
+class Gender(str, Enum):
+    """Gender enumeration."""
+    MALE = "male"
+    FEMALE = "female"
+    OTHER = "other"
+
+
+# ── Sort Order ────────────────────────────────────────────────────────────────
+class SortOrder(str, Enum):
+    """Sort order options."""
+    ASC = "asc"
+    DESC = "desc"
+
+
+# ── File Type ─────────────────────────────────────────────────────────────────
+class FileType(str, Enum):
+    """Supported file types for resume upload."""
+    PDF = "pdf"
+    DOCX = "docx"
+
+
+# ── Skill Source ──────────────────────────────────────────────────────────────
+class SkillSource(str, Enum):
+    """Source of skill extraction."""
+    PROFILE = "profile"
+    RESUME = "resume"
+    MANUAL = "manual"
+
+
+# ── Skill Level ───────────────────────────────────────────────────────────────
+class SkillLevel(str, Enum):
+    """Skill proficiency level."""
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+    EXPERT = "expert"

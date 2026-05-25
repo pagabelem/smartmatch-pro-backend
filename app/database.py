@@ -2,6 +2,7 @@
 database.py — SQLAlchemy engine, session factory, and declarative Base.
 """
 
+from typing import TYPE_CHECKING
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -70,6 +71,14 @@ SessionLocal = sessionmaker(
 )
 
 
+# ── Declarative Base ─────────────────────────────────────────────────────────
+class Base(DeclarativeBase):
+    """
+    All SQLAlchemy models must inherit from this Base.
+    """
+    pass
+
+
 # ── Dependency for FastAPI routes ────────────────────────────────────────────
 async def get_db() -> AsyncSession:
     """
@@ -85,14 +94,6 @@ async def get_db() -> AsyncSession:
             raise
         finally:
             await session.close()
-
-
-# ── Declarative Base ─────────────────────────────────────────────────────────
-class Base(DeclarativeBase):
-    """
-    All SQLAlchemy models must inherit from this Base.
-    """
-    pass
 
 
 # ── Utility functions ────────────────────────────────────────────────────────
@@ -124,3 +125,9 @@ async def check_db_connection_async() -> bool:
         return True
     except Exception:
         return False
+
+
+# ── IMPORT MODELS AFTER BASE (with TYPE_CHECKING to avoid circular) ──────────
+if not TYPE_CHECKING:
+    from app.modules.users.user_model import User, Profile  # noqa: F401, E402
+    # NE PAS IMPORTER RefreshToken ICI pour éviter l'import circulaire

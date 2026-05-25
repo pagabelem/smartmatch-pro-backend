@@ -10,7 +10,7 @@ from app.core.exceptions import (
     NotFoundException,
 )
 from app.core.security import (
-    create_access_token,
+    create_access_token_with_expires,
     create_refresh_token,
     decode_refresh_token,
     hash_password,
@@ -20,14 +20,14 @@ from app.modules.auth.auth_model import RefreshToken
 from app.modules.auth.auth_schema import LoginRequest, RegisterRequest
 from app.modules.users.user_model import Profile, User
 
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _build_token_pair(user: User, db: Session,
                       user_agent: str | None = None,
                       ip_address: str | None = None) -> dict:
-    access_token  = create_access_token(subject=user.id)
+    access_token = create_access_token_with_expires(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(subject=user.id)
 
-    # Utilisation de UTC pour la cohérence
     expires_at = datetime.now(timezone.utc) + timedelta(
         days=settings.REFRESH_TOKEN_EXPIRE_DAYS
     )
@@ -43,12 +43,13 @@ def _build_token_pair(user: User, db: Session,
     db.commit()
 
     return {
-        "access_token":  access_token,
+        "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type":    "Bearer",
-        "expires_in":    settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user":          user,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": user,
     }
+
 
 # ── Public service functions ──────────────────────────────────────────────────
 def register(db: Session, payload: RegisterRequest, user_agent: str | None = None, ip_address: str | None = None) -> dict:
@@ -61,7 +62,8 @@ def register(db: Session, payload: RegisterRequest, user_agent: str | None = Non
         hashed_password=hash_password(payload.password),
     )
     db.add(user)
-    db.flush()
+    db.commit()
+    db.refresh(user)
 
     profile = Profile(
         user_id=user.id,
@@ -73,6 +75,7 @@ def register(db: Session, payload: RegisterRequest, user_agent: str | None = Non
     db.refresh(user)
 
     return _build_token_pair(user, db, user_agent, ip_address)
+
 
 def login(db: Session, payload: LoginRequest, user_agent: str | None = None, ip_address: str | None = None) -> dict:
     user = db.query(User).filter(User.email == payload.email).first()
@@ -88,6 +91,7 @@ def login(db: Session, payload: LoginRequest, user_agent: str | None = None, ip_
     db.refresh(user)
 
     return _build_token_pair(user, db, user_agent, ip_address)
+
 
 def refresh(db: Session, refresh_token_str: str, user_agent: str | None = None, ip_address: str | None = None) -> dict:
     try:
@@ -115,9 +119,7 @@ def refresh(db: Session, refresh_token_str: str, user_agent: str | None = None, 
             "Refresh token already used. All sessions have been revoked for security."
         )
 
-    # FIX: Comparaison sécurisée entre Aware (timezone.utc) et Naive (DB)
     now = datetime.now(timezone.utc)
-    # On s'assure que db_token.expires_at est traité comme aware pour la comparaison
     if db_token.expires_at.tzinfo is None:
         db_token_expiry = db_token.expires_at.replace(tzinfo=timezone.utc)
     else:
@@ -135,11 +137,13 @@ def refresh(db: Session, refresh_token_str: str, user_agent: str | None = None, 
 
     return _build_token_pair(user, db, user_agent, ip_address)
 
+
 def logout(db: Session, refresh_token_str: str) -> None:
     db_token = db.query(RefreshToken).filter(RefreshToken.token == refresh_token_str).first()
     if db_token:
         db_token.is_revoked = True
         db.commit()
+
 
 def logout_all(db: Session, user_id: int) -> None:
     db.query(RefreshToken).filter(
@@ -147,6 +151,7 @@ def logout_all(db: Session, user_id: int) -> None:
         RefreshToken.is_revoked == False,
     ).update({"is_revoked": True})
     db.commit()
+
 
 def get_current_user_from_token(db: Session, token: str) -> User:
     from app.core.security import decode_access_token
@@ -162,3 +167,28 @@ def get_current_user_from_token(db: Session, token: str) -> User:
     if not user.is_active:
         raise InvalidTokenException("Account is deactivated.")
     return user
+
+
+def change_password(db: Session, user: User, old_password: str, new_password: str) -> bool:
+    """
+    Change user password.
+    
+    Args:
+        db: Database session
+        user: User object
+        old_password: Current password
+        new_password: New password
+    
+    Returns:
+        True if password changed successfully
+    
+    Raises:
+        InvalidCredentialsException: If old password is incorrect
+    """
+    if not verify_password(old_password, user.hashed_password):
+        raise InvalidCredentialsException("Current password is incorrect")
+    
+    user.hashed_password = hash_password(new_password)
+    db.commit()
+    
+    return True

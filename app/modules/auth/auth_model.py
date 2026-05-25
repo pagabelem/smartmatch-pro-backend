@@ -11,8 +11,15 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-# On importe User depuis son module d'origine pour éviter le conflit de table
-from app.modules.users.user_model import User 
+from app.modules.users.user_model import User
+
+# En haut du fichier auth_model.py
+from typing import TYPE_CHECKING
+
+
+from app.modules.users.user_model import User
+
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -67,9 +74,8 @@ class RefreshToken(Base):
     user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    # Relationship
-    # Utilisation de la classe User importée
-    user: Mapped["User"] = relationship("User", backref="refresh_tokens")
+    # Relationship - Utilisation de la classe User importée
+    user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
 
     def __repr__(self) -> str:
         return (

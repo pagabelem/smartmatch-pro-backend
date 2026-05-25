@@ -14,14 +14,11 @@ Design decisions
 Relationships
 -------------
   User  ──(1:1)──  Profile
+  User  ──(1:N)──  RefreshToken
   User  ──(1:N)──  (Resume, Favorite, etc. — FK defined on those models)
 """
 
 from datetime import datetime, timezone
-# app/modules/users/user_model.py
-
-
-
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -34,7 +31,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.database import Base
-
+from typing import TYPE_CHECKING
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _now() -> datetime:
@@ -108,7 +105,15 @@ class User(Base):
         "Profile",
         back_populates="user",
         uselist=False,
-        cascade="all, delete-orphan",   # deleting User also deletes Profile
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    # One User has many RefreshTokens
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        "RefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
         lazy="select",
     )
 
@@ -258,3 +263,4 @@ class Profile(Base):
             f"<Profile id={self.id} user_id={self.user_id} "
             f"name={self.full_name!r}>"
         )
+  
