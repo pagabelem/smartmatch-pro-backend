@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from jose import JWTError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.config import settings
 from app.core.exceptions import (
@@ -22,7 +23,7 @@ from app.modules.users.user_model import Profile, User
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def _build_token_pair(user: User, db: Session,
+async def _build_token_pair(user: User, db: AsyncSession,
                       user_agent: str | None = None,
                       ip_address: str | None = None) -> dict:
     access_token = create_access_token_with_expires(data={"sub": str(user.id)})
@@ -40,7 +41,7 @@ def _build_token_pair(user: User, db: Session,
         ip_address=ip_address,
     )
     db.add(db_token)
-    db.commit()
+    await db.commit()
 
     return {
         "access_token": access_token,
@@ -52,8 +53,10 @@ def _build_token_pair(user: User, db: Session,
 
 
 # ── Public service functions ──────────────────────────────────────────────────
-def register(db: Session, payload: RegisterRequest, user_agent: str | None = None, ip_address: str | None = None) -> dict:
-    existing = db.query(User).filter(User.email == payload.email).first()
+async def register(db: AsyncSession, payload: RegisterRequest, user_agent: str | None = None, ip_address: str | None = None) -> dict:
+    result = await db.execute(select(User).where(User.email == payload.email))
+    existing = result.scalar_one_or_none()
+    
     if existing:
         raise EmailAlreadyExistsException(payload.email)
 
@@ -62,8 +65,8 @@ def register(db: Session, payload: RegisterRequest, user_agent: str | None = Non
         hashed_password=hash_password(payload.password),
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
     profile = Profile(
         user_id=user.id,
@@ -71,14 +74,15 @@ def register(db: Session, payload: RegisterRequest, user_agent: str | None = Non
         last_name=payload.last_name,
     )
     db.add(profile)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
-    return _build_token_pair(user, db, user_agent, ip_address)
+    return await _build_token_pair(user, db, user_agent, ip_address)
 
 
-def login(db: Session, payload: LoginRequest, user_agent: str | None = None, ip_address: str | None = None) -> dict:
-    user = db.query(User).filter(User.email == payload.email).first()
+async def login(db: AsyncSession, payload: LoginRequest, user_agent: str | None = None, ip_address: str | None = None) -> dict:
+    result = await db.execute(select(User).where(User.email == payload.email))
+    user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.hashed_password):
         raise InvalidCredentialsException()
@@ -87,13 +91,13 @@ def login(db: Session, payload: LoginRequest, user_agent: str | None = None, ip_
         raise InvalidCredentialsException("Account is deactivated.")
 
     user.last_login_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
-    return _build_token_pair(user, db, user_agent, ip_address)
+    return await _build_token_pair(user, db, user_agent, ip_address)
 
 
-def refresh(db: Session, refresh_token_str: str, user_agent: str | None = None, ip_address: str | None = None) -> dict:
+async def refresh(db: AsyncSession, refresh_token_str: str, user_agent: str | None = None, ip_address: str | None = None) -> dict:
     try:
         payload = decode_refresh_token(refresh_token_str)
     except JWTError:
@@ -101,20 +105,19 @@ def refresh(db: Session, refresh_token_str: str, user_agent: str | None = None, 
 
     user_id = int(payload["sub"])
 
-    db_token = (
-        db.query(RefreshToken)
-        .filter(
+    result = await db.execute(
+        select(RefreshToken).where(
             RefreshToken.token == refresh_token_str,
             RefreshToken.user_id == user_id,
         )
-        .first()
     )
+    db_token = result.scalar_one_or_none()
 
     if not db_token:
         raise InvalidTokenException("Refresh token not recognised.")
 
     if db_token.is_revoked:
-        logout_all(db, user_id)
+        await logout_all(db, user_id)
         raise InvalidTokenException(
             "Refresh token already used. All sessions have been revoked for security."
         )
@@ -129,47 +132,66 @@ def refresh(db: Session, refresh_token_str: str, user_agent: str | None = None, 
         raise InvalidTokenException("Refresh token has expired.")
 
     db_token.is_revoked = True
-    db.commit()
+    await db.commit()
 
-    user = db.get(User, user_id)
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
     if not user or not user.is_active:
         raise NotFoundException("User", user_id)
 
-    return _build_token_pair(user, db, user_agent, ip_address)
+    return await _build_token_pair(user, db, user_agent, ip_address)
 
 
-def logout(db: Session, refresh_token_str: str) -> None:
-    db_token = db.query(RefreshToken).filter(RefreshToken.token == refresh_token_str).first()
+async def logout(db: AsyncSession, refresh_token_str: str) -> None:
+    result = await db.execute(select(RefreshToken).where(RefreshToken.token == refresh_token_str))
+    db_token = result.scalar_one_or_none()
+    
     if db_token:
         db_token.is_revoked = True
-        db.commit()
+        await db.commit()
 
 
-def logout_all(db: Session, user_id: int) -> None:
-    db.query(RefreshToken).filter(
-        RefreshToken.user_id == user_id,
-        RefreshToken.is_revoked == False,
-    ).update({"is_revoked": True})
-    db.commit()
+async def logout_all(db: AsyncSession, user_id: int) -> None:
+    result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.is_revoked == False,
+        )
+    )
+    tokens = result.scalars().all()
+    
+    for token in tokens:
+        token.is_revoked = True
+    
+    await db.commit()
 
 
-def get_current_user_from_token(db: Session, token: str) -> User:
+async def get_current_user_from_token(db: AsyncSession, token: str) -> User | None:
+    """
+    Récupère l'utilisateur à partir du token JWT.
+    """
     from app.core.security import decode_access_token
+    
     try:
         payload = decode_access_token(token)
     except JWTError:
-        raise InvalidTokenException()
+        return None
 
     user_id = int(payload["sub"])
-    user = db.get(User, user_id)
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
     if not user:
-        raise NotFoundException("User", user_id)
+        return None
+        
     if not user.is_active:
-        raise InvalidTokenException("Account is deactivated.")
+        return None
+        
     return user
 
 
-def change_password(db: Session, user: User, old_password: str, new_password: str) -> bool:
+async def change_password(db: AsyncSession, user: User, old_password: str, new_password: str) -> bool:
     """
     Change user password.
     
@@ -189,6 +211,6 @@ def change_password(db: Session, user: User, old_password: str, new_password: st
         raise InvalidCredentialsException("Current password is incorrect")
     
     user.hashed_password = hash_password(new_password)
-    db.commit()
+    await db.commit()
     
     return True

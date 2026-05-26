@@ -117,11 +117,6 @@ class User(Base):
         lazy="select",
     )
 
-    # These relationships will be declared in the other modules' models.
-    # Placeholder comments for Alembic / IDE awareness:
-    # resumes: list["Resume"]       → defined in modules/resumes/resume_model.py
-    # favorites: list["Favorite"]   → defined in modules/favorites/favorite_model.py
-
     # ── Dunder ────────────────────────────────────────────────────────────────
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email!r} active={self.is_active}>"
@@ -230,6 +225,13 @@ class Profile(Base):
         back_populates="profile",
     )
 
+    # ✅ PHASE 4 — Relationship with Resume
+    resumes: Mapped[list["Resume"]] = relationship(
+        "Resume",
+        back_populates="profile",
+        cascade="all, delete-orphan",
+    )
+
     # ── Computed helpers ──────────────────────────────────────────────────────
     @property
     def full_name(self) -> str:
@@ -263,4 +265,3 @@ class Profile(Base):
             f"<Profile id={self.id} user_id={self.user_id} "
             f"name={self.full_name!r}>"
         )
-  

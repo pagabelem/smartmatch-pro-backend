@@ -31,13 +31,11 @@ from app.modules.auth.auth_model import RefreshToken        # noqa: F401
 from app.modules.skills.skill_model import Skill            # noqa: F401
 
 # ── Import routers ────────────────────────────────────────────────────────────
-# Phase 1 routers
 from app.modules.auth.auth_router import router as auth_router
 from app.modules.skills.skill_router import router as skills_router
-
-# Routers des phases suivantes
 from app.modules.users.user_router import router as users_router
 from app.modules.profiles.profile_router import router as profiles_router
+from app.modules.resumes.resume_router import router as resumes_router  # ✅ PHASE 4
 
 API_PREFIX = "/api/v1"
 
@@ -116,6 +114,7 @@ def create_app() -> FastAPI:
     app.include_router(skills_router, prefix=API_PREFIX, tags=["Skills"])
     app.include_router(users_router, prefix=API_PREFIX, tags=["Users"])
     app.include_router(profiles_router, prefix=API_PREFIX, tags=["Profiles"])
+    app.include_router(resumes_router, prefix=API_PREFIX, tags=["Resumes"])  # ✅ PHASE 4
 
     return app
 
@@ -152,5 +151,3 @@ def health_check() -> JSONResponse:
 def root():
     """Redirect browsers hitting the root URL to the API docs."""
     return RedirectResponse(url="/docs")
-
-

@@ -106,6 +106,52 @@ def mask_email(email: str) -> str:
 
 
 # ── File utilities ────────────────────────────────────────────────────────────
+def generate_uuid() -> str:
+    """
+    Generate a unique UUID string.
+
+    Example:
+        generate_uuid()  → "3f2a4b5c-8d1e-4a2b-9c3d-1e2f3a4b5c6d"
+    """
+    return str(uuid.uuid4())
+
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize a filename to be filesystem-safe.
+
+    Removes dangerous characters, replaces spaces with underscores,
+    and normalizes Unicode.
+
+    Examples:
+        sanitize_filename("My CV 2025.pdf")  → "My_CV_2025.pdf"
+        sanitize_filename("file/name?.txt")  → "file_name.txt"
+        sanitize_filename("   ")              → "unnamed"
+    """
+    if not filename or not filename.strip():
+        return "unnamed"
+    
+    # Split into name and extension
+    path = Path(filename)
+    stem = path.stem
+    extension = path.suffix
+    
+    # Replace spaces and dangerous characters
+    sanitized_stem = re.sub(r'[<>:"/\\|?*]', '_', stem)
+    sanitized_stem = re.sub(r'[\s]+', '_', sanitized_stem)
+    sanitized_stem = re.sub(r'_+', '_', sanitized_stem)
+    sanitized_stem = sanitized_stem.strip('_')
+    
+    # Normalize Unicode
+    sanitized_stem = unicodedata.normalize('NFKD', sanitized_stem)
+    sanitized_stem = sanitized_stem.encode('ascii', 'ignore').decode('ascii')
+    
+    if not sanitized_stem:
+        sanitized_stem = "unnamed"
+    
+    return f"{sanitized_stem}{extension}"
+
+
 def generate_unique_filename(original_filename: str) -> str:
     """
     Generate a collision-safe filename by prepending a UUID.
