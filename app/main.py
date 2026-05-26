@@ -29,6 +29,7 @@ from app.core.exceptions import (
 from app.modules.users.user_model import Profile, User      # noqa: F401
 from app.modules.auth.auth_model import RefreshToken        # noqa: F401
 from app.modules.skills.skill_model import Skill            # noqa: F401
+from app.modules.resumes.resume_model import Resume         # noqa: F401 ✅ PHASE 4
 
 # ── Import routers ────────────────────────────────────────────────────────────
 from app.modules.auth.auth_router import router as auth_router
@@ -36,6 +37,10 @@ from app.modules.skills.skill_router import router as skills_router
 from app.modules.users.user_router import router as users_router
 from app.modules.profiles.profile_router import router as profiles_router
 from app.modules.resumes.resume_router import router as resumes_router  # ✅ PHASE 4
+from app.modules.nlp.nlp_router import router as nlp_router            # ✅ PHASE 5
+
+# ── Import NLP preload function ───────────────────────────────────────────────
+from app.modules.nlp.nlp_service import preload_nlp_model  # ✅ PHASE 5
 
 API_PREFIX = "/api/v1"
 
@@ -60,6 +65,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "Run 'alembic upgrade head' to create the tables."
         )
     print("    Database    : ✓ connection OK")
+
+    # ✅ PHASE 5 : Chargement du modèle NLP (spaCy) au démarrage
+    preload_nlp_model()
 
     yield  # ← application is running
 
@@ -115,6 +123,7 @@ def create_app() -> FastAPI:
     app.include_router(users_router, prefix=API_PREFIX, tags=["Users"])
     app.include_router(profiles_router, prefix=API_PREFIX, tags=["Profiles"])
     app.include_router(resumes_router, prefix=API_PREFIX, tags=["Resumes"])  # ✅ PHASE 4
+    app.include_router(nlp_router, prefix=API_PREFIX, tags=["NLP"])          # ✅ PHASE 5
 
     return app
 
