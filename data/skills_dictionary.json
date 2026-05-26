@@ -1,0 +1,47 @@
+{
+  "languages": [
+    "python", "javascript", "java", "c++", "c#", "go", "rust",
+    "php", "ruby", "swift", "kotlin", "typescript", "scala",
+    "r", "matlab", "perl", "bash", "shell", "powershell",
+    "html", "css", "sass", "less", "sql", "pl/sql", "t-sql",
+    "dart", "elixir", "clojure", "haskell", "lua", "groovy"
+  ],
+  "frameworks": [
+    "fastapi", "django", "flask", "react", "vue", "angular",
+    "spring", "laravel", "rails", "asp.net", "express", "nextjs",
+    "nuxtjs", "nestjs", "symfony", "codeigniter", "svelte",
+    "fastify", "starlette", "celery", "tensorflow", "pytorch",
+    "keras", "scikit-learn", "pandas", "numpy", "jupyter",
+    "bootstrap", "tailwind", "material-ui", "ant-design"
+  ],
+  "databases": [
+    "postgresql", "mysql", "mongodb", "redis", "elasticsearch",
+    "cassandra", "sqlite", "oracle", "mariadb", "dynamodb",
+    "neo4j", "couchdb", "influxdb", "clickhouse", "supabase",
+    "firebase", "realm", "sql server", "db2", "teradata"
+  ],
+  "cloud": [
+    "aws", "azure", "gcp", "docker", "kubernetes", "terraform",
+    "ansible", "jenkins", "gitlab ci", "github actions", "circleci",
+    "helm", "prometheus", "grafana", "nginx", "traefik",
+    "cloudflare", "heroku", "vercel", "netlify", "openshift",
+    "rancher", "vagrant", "packer", "consul", "nomad"
+  ],
+  "tools": [
+    "git", "jira", "confluence", "figma", "photoshop", "illustrator",
+    "office", "excel", "power bi", "tableau", "notion", "slack",
+    "postman", "swagger", "sonarqube", "datadog", "sentry",
+    "linux", "macos", "windows", "vscode", "intellij", "pycharm",
+    "eclipse", "visual studio", "xcode", "android studio",
+    "trello", "asana", "clickup", "monday", "zoom", "teams"
+  ],
+  "soft_skills": [
+    "leadership", "teamwork", "communication", "problem solving",
+    "adaptability", "creativity", "time management", "critical thinking",
+    "emotional intelligence", "autonomy", "rigor", "curiosity",
+    "mentoring", "coaching", "project management", "agile", "scrum",
+    "kanban", "negotiation", "presentation", "conflict resolution",
+    "decision making", "stress management", "empathy", "resilience",
+    "proactivity", "innovation", "strategic thinking", "delegation"
+  ]
+}
