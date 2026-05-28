@@ -1,13 +1,6 @@
 """
 app/modules/resumes/resume_router.py
 Endpoints REST pour le module Resumes.
-
-Routes :
-  POST   /api/v1/resumes/upload              — Upload CV (multipart/form-data)
-  GET    /api/v1/resumes/{resume_id}         — Récupérer un CV par ID
-  GET    /api/v1/resumes/{resume_id}/text    — Texte brut extrait
-  GET    /api/v1/resumes/profile/{profile_id} — CVs d'un profil (paginé)
-  DELETE /api/v1/resumes/{resume_id}         — Supprimer un CV
 """
 
 import logging
@@ -29,7 +22,6 @@ from app.modules.resumes.resume_schema import (
     ResumeUploadResponse,
     ResumeResponse,
     ResumeListResponse,
-    ResumeTextResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,7 +29,7 @@ router = APIRouter(prefix="/resumes", tags=["Resumes"])
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helper
 # ---------------------------------------------------------------------------
 
 async def _assert_owner_or_admin(
@@ -46,7 +38,6 @@ async def _assert_owner_or_admin(
     db: AsyncSession
 ) -> None:
     """Vérifie que l'utilisateur est propriétaire du profil ou admin."""
-    # Charger explicitement le profile
     result = await db.execute(
         select(User).where(User.id == current_user.id).options(selectinload(User.profile))
     )
@@ -61,6 +52,16 @@ async def _assert_owner_or_admin(
 
 
 # ---------------------------------------------------------------------------
+# GET /test (route de test)
+# ---------------------------------------------------------------------------
+
+@router.get("/test", tags=["Resumes"])
+async def test_resumes_route():
+    """Route de test pour vérifier que le routeur est chargé."""
+    return {"message": "Resumes router is working!"}
+
+
+# ---------------------------------------------------------------------------
 # POST /upload
 # ---------------------------------------------------------------------------
 
@@ -68,20 +69,13 @@ async def _assert_owner_or_admin(
     "/upload",
     response_model=None,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload d'un CV (PDF ou DOCX)",
-    description=(
-        "Téléverse un fichier CV au format PDF ou DOCX. "
-        "Valide l'extension et la taille avant écriture. "
-        "Extrait le texte brut et le stocke pour le module NLP."
-    ),
 )
 async def upload_resume(
-    file: UploadFile = File(..., description="Fichier CV (PDF ou DOCX)"),
+    file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Upload un CV et extrait son texte brut."""
-    # Charger explicitement le profile
     result = await db.execute(
         select(User).where(User.id == current_user.id).options(selectinload(User.profile))
     )
@@ -92,14 +86,10 @@ async def upload_resume(
 
     profile_id = current_user.profile.id
 
-    # 1. Sauvegarde physique + validation
     file_path, file_size, mime_type = await svc.save_resume_file(file, profile_id)
-
-    # 2. Extraction texte brut
     absolute_path = str(Path(settings.UPLOAD_DIR) / file_path)
     raw_text = svc.extract_raw_text(absolute_path, mime_type)
 
-    # 3. Enregistrement BDD
     resume = await svc.create_resume_record(
         db=db,
         profile_id=profile_id,
@@ -110,7 +100,15 @@ async def upload_resume(
         raw_text=raw_text,
     )
 
-    response_data = ResumeUploadResponse.model_validate(resume).model_dump()
+    response_data = ResumeUploadResponse(
+        id=resume.id,
+        filename=resume.filename,
+        file_path=resume.file_path,
+        file_size=resume.file_size,
+        is_parsed=resume.is_parsed,
+        created_at=resume.created_at,
+    ).model_dump()
+    
     return success_response(data=response_data, message="CV uploadé avec succès.")
 
 
@@ -122,12 +120,11 @@ async def upload_resume(
     "/profile/{profile_id}",
     response_model=None,
     summary="Liste des CVs d'un profil",
-    description="Retourne tous les CVs associés à un profil, paginés.",
 )
 async def list_resumes_by_profile(
     profile_id: int,
-    page: int = Query(1, ge=1, description="Numéro de page"),
-    limit: int = Query(10, ge=1, le=50, description="CVs par page"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -162,7 +159,7 @@ async def get_resume(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Retourne les métadonnées complètes d'un CV, incluant le texte extrait."""
+    """Retourne les métadonnées complètes d'un CV."""
     resume = await svc.get_resume_by_id(db, resume_id)
     await _assert_owner_or_admin(resume.profile_id, current_user, db)
 
@@ -179,7 +176,6 @@ async def get_resume(
     "/{resume_id}/text",
     response_model=None,
     summary="Texte brut extrait d'un CV",
-    description="Retourne uniquement le texte brut issu du parsing du CV.",
 )
 async def get_resume_text(
     resume_id: int,
@@ -190,7 +186,6 @@ async def get_resume_text(
     resume = await svc.get_resume_by_id(db, resume_id)
     await _assert_owner_or_admin(resume.profile_id, current_user, db)
 
-    # ✅ CORRECTION : utiliser un dictionnaire simple au lieu de ResumeTextResponse
     return success_response(
         data={
             "id": resume.id,
@@ -207,7 +202,6 @@ async def get_resume_text(
     "/{resume_id}",
     status_code=status.HTTP_200_OK,
     summary="Supprimer un CV",
-    description="Supprime le fichier physique ET l'enregistrement en base.",
 )
 async def delete_resume(
     resume_id: int,

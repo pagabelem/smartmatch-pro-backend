@@ -31,7 +31,10 @@ class Settings(BaseSettings):
 
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
-    UPLOAD_DIR: str = "app/storage/uploads"
+    # ✅ CORRIGÉ : UPLOAD_DIR modifié
+    UPLOAD_DIR: str = "app/storage"
+    # ✅ AJOUTÉ : STORAGE_DIR pour le module storage
+    STORAGE_DIR: str = "app/storage"
     MAX_FILE_SIZE_MB: int = 5
     ALLOWED_RESUME_EXTENSIONS: str = "pdf,docx"
 

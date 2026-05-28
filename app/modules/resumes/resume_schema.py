@@ -15,6 +15,7 @@ class ResumeUploadResponse(BaseModel):
 
     id: int
     filename: str
+    file_path: str  # ✅ AJOUTÉ
     file_size: int = Field(..., description="Taille du fichier en octets")
     is_parsed: bool
     created_at: datetime
@@ -24,7 +25,6 @@ class ResumeResponse(ResumeUploadResponse):
     """Réponse complète incluant le texte extrait et le chemin."""
 
     raw_text: Optional[str] = None
-    file_path: str
     mime_type: str
     profile_id: int
     updated_at: datetime

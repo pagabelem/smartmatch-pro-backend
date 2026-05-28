@@ -88,7 +88,7 @@ async def save_resume_file(
     safe_name = sanitize_filename(Path(original_name).stem)
     unique_name = f"{safe_name}_{generate_uuid()}.{ext}"
 
-    # Chemin relatif stocké en BDD
+    # ✅ CORRIGÉ : Chemin relatif stocké en BDD (sans "uploads/" pour éviter double dossier)
     relative_path = f"resumes/{profile_id}/{unique_name}"
     absolute_path = Path(settings.UPLOAD_DIR) / relative_path
 
