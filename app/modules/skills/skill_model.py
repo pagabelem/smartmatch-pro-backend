@@ -1,86 +1,70 @@
-# app/modules/skills/skill_model.py
+"""
+skills/skill_model.py — Skill SQLAlchemy model.
 
-from datetime import datetime
+The skills table is the reference taxonomy of competences.
+It is populated via:
+  - scripts/seed_skills.py  (initial load from CSV)
+  - POST /skills            (admin endpoint)
+  - NLP module              (auto-discovery at extraction time)
 
-from sqlalchemy import Boolean, Column, DateTime, Enum as SAEnum, Integer, String, Text
+Relationships (defined in other modules):
+  Skill ──(M:N)── Job      (via job_skills association table — Phase Membre 2)
+  Skill ──(M:N)── Profile  (via profile_skills — Phase 3)
+"""
+
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-from app.shared.enums import SkillCategory, SkillType
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Skill(Base):
-    """
-    Table 'skills' — Référentiel central des compétences.
-
-    Propriétaire  : Membre 2
-    Consommateurs : Module NLP (Membre 1), Matching, Skill Gap, Jobs (Membre 2)
-
-    Colonnes clés
-    -------------
-    skill_type      : hard | soft  (enum SkillType)
-    sub_category    : sous-domaine technique (enum SkillCategory) — optionnel
-    normalized_name : version lowercase/nettoyée utilisée par le NLP et le Matching
-    """
-
     __tablename__ = "skills"
 
-    # ── Clé primaire ───────────────────────────────────────────────────────────
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
-    # ── Identification ─────────────────────────────────────────────────────────
-    name = Column(
+    name: Mapped[str] = mapped_column(
         String(100),
         unique=True,
-        nullable=False,
         index=True,
-        comment="Nom affiché de la compétence (ex: Python, Communication)",
+        nullable=False,
+        doc="Canonical skill name in lowercase-normalised form. E.g. 'python', 'react'.",
     )
-    normalized_name = Column(
+
+    # Human-readable display name (may differ in casing from `name`)
+    display_name: Mapped[str] = mapped_column(
         String(100),
-        unique=True,
         nullable=False,
+        doc="Display-friendly version. E.g. 'Python', 'React', 'Power BI'.",
+    )
+
+    # Category — matches SkillCategory enum
+    category: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
         index=True,
-        comment="Nom normalisé lowercase sans ponctuation — clé de matching NLP",
+        doc="Skill sub-domain. E.g. 'ai_ml', 'web_frontend'. See shared/enums.py SkillCategory.",
     )
 
-    # ── Classification ─────────────────────────────────────────────────────────
-    skill_type = Column(
-        SAEnum(SkillType, values_callable=lambda e: [i.value for i in e]),
+    # Skill type: 'hard' or 'soft'
+    skill_type: Mapped[str] = mapped_column(
+        String(10),
         nullable=False,
-        comment="hard (technique) ou soft (comportementale)",
-    )
-    sub_category = Column(
-        SAEnum(SkillCategory, values_callable=lambda e: [i.value for i in e]),
-        nullable=True,
-        comment="Sous-domaine optionnel : programming, ai_ml, database, devops…",
+        default="hard",
+        doc="'hard' (technical) or 'soft' (interpersonal). See shared/enums.py SkillType.",
     )
 
-    # ── Description ────────────────────────────────────────────────────────────
-    description = Column(
-        Text,
-        nullable=True,
-        comment="Description libre de la compétence",
-    )
-
-    # ── Statut ─────────────────────────────────────────────────────────────────
-    is_active = Column(
-        Boolean,
-        default=True,
-        nullable=False,
-        comment="False = désactivée, non suggérée dans l'UI ni utilisée par le NLP",
-    )
-
-    # ── Timestamps ─────────────────────────────────────────────────────────────
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_now,
         nullable=False,
     )
 
     def __repr__(self) -> str:
-        return (
-            f"<Skill id={self.id} name='{self.name}' "
-            f"type='{self.skill_type}' active={self.is_active}>"
-        )
+        return f"<Skill id={self.id} name={self.name!r} type={self.skill_type}>"

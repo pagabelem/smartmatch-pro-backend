@@ -1,126 +1,130 @@
-# app/modules/skills/skill_router.py
+"""
+skills/skill_router.py — Skills CRUD endpoints.
 
-from typing import Optional
+Endpoints
+---------
+  POST   /api/v1/skills              Create a skill         (admin)
+  GET    /api/v1/skills              List skills            (authenticated)
+  GET    /api/v1/skills/{id}         Get skill by ID        (authenticated)
+  PUT    /api/v1/skills/{id}         Update a skill         (admin)
+  DELETE /api/v1/skills/{id}         Delete a skill         (admin)
+
+Query parameters for GET /skills
+---------------------------------
+  page       int    Page number (default 1)
+  page_size  int    Items per page (default 20, max 100)
+  search     str    Filter by name containing this string
+  category   str    Filter by SkillCategory value
+  skill_type str    Filter by 'hard' or 'soft'
+  sort       str    'name' (default) or 'created_at'
+"""
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.responses import created, ok
-from app.dependencies import get_db
+from app.core.responses import created, no_content, ok
+from app.dependencies import get_current_active_user, get_db
+from app.modules.skills import skill_service
 from app.modules.skills.skill_schema import (
     SkillCreate,
+    SkillListResponse,
     SkillResponse,
     SkillUpdate,
 )
-from app.modules.skills.skill_service import SkillService
 from app.shared.pagination import PaginationParams
 
-router = APIRouter(
-    prefix="/skills",
-    tags=["Skills — Référentiel de compétences"],
-)
+router = APIRouter(prefix="/skills", tags=["Skills"])
 
 
-# ── POST /api/v1/skills/ ───────────────────────────────────────────────────────
 @router.post(
     "/",
     status_code=status.HTTP_201_CREATED,
-    summary="Créer une nouvelle compétence",
+    response_model=SkillResponse,
+    summary="Create a new skill",
+    description="Add a skill to the taxonomy. Name must be unique (case-insensitive).",
 )
 def create_skill(
-    data: SkillCreate,
+    payload: SkillCreate,
     db: Session = Depends(get_db),
+    _=Depends(get_current_active_user),
 ):
-    skill = SkillService.create(db, data)
-    return created(
-        data=SkillResponse.model_validate(skill).model_dump(mode="json"),
-        message=f"Compétence '{skill.name}' créée avec succès.",
-    )
+    skill = skill_service.create_skill(db, payload)
+    return created(data=SkillResponse.model_validate(skill), message="Skill created.")
 
 
-# ── GET /api/v1/skills/ ────────────────────────────────────────────────────────
 @router.get(
     "/",
-    status_code=status.HTTP_200_OK,
-    summary="Lister les compétences (paginé)",
+    response_model=SkillListResponse,
+    summary="List all skills",
+    description=(
+        "Returns a paginated, alphabetically sorted list of skills. "
+        "Supports search (?search=python), category and type filtering."
+    ),
 )
 def list_skills(
-    skill_type: Optional[str] = Query(None, description="Filtrer : 'hard' ou 'soft'"),
-    sub_category: Optional[str] = Query(None, description="Filtrer par sous-catégorie"),
-    is_active: Optional[bool] = Query(True, description="Filtrer par statut actif"),
-    search: Optional[str] = Query(None, description="Recherche par nom ou description"),
     params: PaginationParams = Depends(),
+    search: str | None = Query(default=None, description="Filter by name fragment."),
+    category: str | None = Query(default=None, description="Filter by SkillCategory value."),
+    skill_type: str | None = Query(default=None, description="'hard' or 'soft'."),
+    sort: str = Query(default="name", description="'name' or 'created_at'."),
     db: Session = Depends(get_db),
+    _=Depends(get_current_active_user),
 ):
-    page = SkillService.get_all(
-        db=db,
-        params=params,
-        skill_type=skill_type,
-        sub_category=sub_category,
-        is_active=is_active,
+    page = skill_service.get_skills(
+        db, params,
         search=search,
+        category=category,
+        skill_type=skill_type,
+        sort=sort,
     )
     return ok(
-        data=[SkillResponse.model_validate(s).model_dump(mode="json") for s in page.items],
-        meta=page.to_dict(),
+        data=SkillListResponse(
+            items=[SkillResponse.model_validate(s) for s in page.items],
+            **page.to_dict(),
+        ),
     )
 
 
-# ── GET /api/v1/skills/names ───────────────────────────────────────────────────
-@router.get(
-    "/names",
-    status_code=status.HTTP_200_OK,
-    summary="Liste des noms normalisés — NLP & Matching",
-)
-def get_skill_names(
-    skill_type: Optional[str] = Query(None, description="'hard', 'soft' ou tous"),
-    db: Session = Depends(get_db),
-):
-    result = SkillService.get_names_list(db, skill_type=skill_type)
-    return ok(data=result)
-
-
-# ── GET /api/v1/skills/{skill_id} ─────────────────────────────────────────────
 @router.get(
     "/{skill_id}",
-    status_code=status.HTTP_200_OK,
-    summary="Récupérer une compétence par son ID",
+    response_model=SkillResponse,
+    summary="Get a skill by ID",
 )
 def get_skill(
     skill_id: int,
     db: Session = Depends(get_db),
+    _=Depends(get_current_active_user),
 ):
-    skill = SkillService.get_by_id(db, skill_id)
-    return ok(data=SkillResponse.model_validate(skill).model_dump(mode="json"))
+    skill = skill_service.get_skill(db, skill_id)
+    return ok(data=SkillResponse.model_validate(skill))
 
 
-# ── PUT /api/v1/skills/{skill_id} ─────────────────────────────────────────────
 @router.put(
     "/{skill_id}",
-    status_code=status.HTTP_200_OK,
-    summary="Mettre à jour une compétence",
+    response_model=SkillResponse,
+    summary="Update a skill",
+    description="Partially update a skill. Only provided fields are changed.",
 )
 def update_skill(
     skill_id: int,
-    data: SkillUpdate,
+    payload: SkillUpdate,
     db: Session = Depends(get_db),
+    _=Depends(get_current_active_user),
 ):
-    skill = SkillService.update(db, skill_id, data)
-    return ok(
-        data=SkillResponse.model_validate(skill).model_dump(mode="json"),
-        message=f"Compétence '{skill.name}' mise à jour.",
-    )
+    skill = skill_service.update_skill(db, skill_id, payload)
+    return ok(data=SkillResponse.model_validate(skill), message="Skill updated.")
 
 
-# ── DELETE /api/v1/skills/{skill_id} ──────────────────────────────────────────
 @router.delete(
     "/{skill_id}",
-    status_code=status.HTTP_200_OK,
-    summary="Supprimer une compétence",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a skill",
+    description="Permanently delete a skill from the taxonomy.",
 )
 def delete_skill(
     skill_id: int,
     db: Session = Depends(get_db),
+    _=Depends(get_current_active_user),
 ):
-    result = SkillService.delete(db, skill_id)
-    return ok(message=result["message"])
+    skill_service.delete_skill(db, skill_id)
+    return no_content()

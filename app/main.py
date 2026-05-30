@@ -1,4 +1,13 @@
-# app/main.py
+"""
+main.py — FastAPI application entry point.
+
+Run with:
+    uvicorn app.main:app --reload
+
+Swagger UI:    http://localhost:8000/docs
+ReDoc:         http://localhost:8000/redoc
+OpenAPI JSON: http://localhost:8000/openapi.json
+"""
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -6,40 +15,51 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.config import settings
 from app.database import check_db_connection
+from app.core.exceptions import (
+    AppException,
+    app_exception_handler,
+    unhandled_exception_handler,
+)
 
-# ── Import tous les modèles ────────────────────────────────────────────────────
-from app.modules.users.user_model     import Profile, User      # noqa: F401
-from app.modules.skills.skill_model   import Skill              # noqa: F401
-from app.modules.jobs.job_model       import Job                # noqa: F401
+# ── Import all models so Alembic / create_all_tables() can see them ───────────
+from app.modules.users.user_model import Profile, User          # noqa: F401
+from app.modules.auth.auth_model import RefreshToken            # noqa: F401
+from app.modules.skills.skill_model import Skill                # noqa: F401
+from app.modules.resumes.resume_model import Resume             # noqa: F401
+from app.modules.jobs.job_model import Job                      # noqa: F401
 from app.modules.imports.import_model import Import             # noqa: F401
 from app.modules.favorites.favorite_model import Favorite       # noqa: F401
 
-# ── Import des routers ────────────────────────────────────────────────────────
-# from app.modules.auth.auth_router        import router as auth_router
-# from app.modules.users.user_router       import router as users_router
-# from app.modules.profiles.profile_router import router as profiles_router
-# from app.modules.resumes.resume_router   import router as resumes_router
-# from app.modules.nlp.nlp_router          import router as nlp_router
+# ── Import routers ────────────────────────────────────────────────────────────
+from app.modules.auth.auth_router import router as auth_router
+from app.modules.skills.skill_router import router as skills_router
+from app.modules.users.user_router import router as users_router
+from app.modules.profiles.profile_router import router as profiles_router
+from app.modules.resumes.resume_router import router as resumes_router
+from app.modules.nlp.nlp_router import router as nlp_router
+from app.modules.storage.storage_router import router as storage_router
 
-from app.modules.skills.skill_router     import router as skills_router
-from app.modules.jobs.job_router         import router as jobs_router
-from app.modules.imports.import_router   import router as imports_router
+from app.modules.jobs.job_router import router as jobs_router
+from app.modules.imports.import_router import router as imports_router
 from app.modules.favorites.favorite_router import router as favorites_router
 
-# from app.modules.matching.matching_router   import router as matching_router
-# from app.modules.skill_gap.skill_gap_router import router as skill_gap_router
-# from app.modules.dashboard.dashboard_router import router as dashboard_router
-# from app.modules.ai.ai_router               import router as ai_router
+# ── Import NLP preload function ───────────────────────────────────────────────
+from app.modules.nlp.nlp_service import preload_nlp_model
 
 API_PREFIX = "/api/v1"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    Code before `yield` runs at startup.
+    Code after  `yield` runs at shutdown.
+    """
+    # ── Startup ───────────────────────────────────────────────────────────────
     print(f"🚀  Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     print(f"    Environment : {settings.ENVIRONMENT}")
     print(f"    Database    : {settings.DATABASE_URL}")
@@ -50,7 +70,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "Run 'alembic upgrade head' to create the tables."
         )
     print("    Database    : ✓ connection OK")
-    yield
+
+    # ✅ PHASE 5 : Chargement du modèle NLP (spaCy) au démarrage
+    preload_nlp_model()
+
+    yield  # ← application is running
+
+    # ── Shutdown ──────────────────────────────────────────────────────────────
     print(f"🛑  Shutting down {settings.APP_NAME}")
 
 
@@ -69,6 +95,7 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
 
+    # ── Middlewares ────────────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins_list,
@@ -83,16 +110,23 @@ def create_app() -> FastAPI:
             allowed_hosts=["yourdomain.com", "www.yourdomain.com"],
         )
 
-    # ── Routers ────────────────────────────────────────────────────────────────
-    app.include_router(skills_router,    prefix=API_PREFIX)
-    app.include_router(jobs_router,      prefix=API_PREFIX)
-    app.include_router(imports_router,   prefix=API_PREFIX)
-    app.include_router(favorites_router, prefix=API_PREFIX)
+    # ── Exception handlers ─────────────────────────────────────────────────
+    app.add_exception_handler(AppException, app_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)
 
-    # app.include_router(matching_router,  prefix=API_PREFIX)
-    # app.include_router(skill_gap_router, prefix=API_PREFIX)
-    # app.include_router(dashboard_router, prefix=API_PREFIX)
-    # app.include_router(ai_router,        prefix=API_PREFIX)
+    # ── Routers ───────────────────────────────────────────────────────────────
+    app.include_router(auth_router, prefix=API_PREFIX, tags=["Authentication"])
+    app.include_router(skills_router, prefix=API_PREFIX, tags=["Skills"])
+    app.include_router(users_router, prefix=API_PREFIX, tags=["Users"])
+    app.include_router(profiles_router, prefix=API_PREFIX, tags=["Profiles"])
+    app.include_router(resumes_router, prefix=API_PREFIX, tags=["Resumes"])
+    app.include_router(nlp_router, prefix=API_PREFIX, tags=["NLP"])
+    app.include_router(storage_router, prefix=API_PREFIX, tags=["Storage"])
+    
+    # Membre 2 routers
+    app.include_router(jobs_router, prefix=API_PREFIX, tags=["Jobs"])
+    app.include_router(imports_router, prefix=API_PREFIX, tags=["Imports"])
+    app.include_router(favorites_router, prefix=API_PREFIX, tags=["Favorites"])
 
     return app
 
@@ -100,7 +134,14 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-@app.get("/health", tags=["System"], summary="Health check")
+# ── Health check ──────────────────────────────────────────────────────────────
+@app.get(
+    "/health",
+    tags=["System"],
+    summary="Health check",
+    description="Returns the operational status of the API and its dependencies.",
+    response_description="Service status payload.",
+)
 def health_check() -> JSONResponse:
     db_ok = check_db_connection()
     payload = {
@@ -115,5 +156,5 @@ def health_check() -> JSONResponse:
 
 @app.get("/", include_in_schema=False)
 def root():
-    from fastapi.responses import RedirectResponse
+    """Redirect browsers hitting the root URL to the API docs."""
     return RedirectResponse(url="/docs")

@@ -121,12 +121,22 @@ class NotFoundException(AppException):
     """Requested resource does not exist."""
     code = "NOT_FOUND"
 
-    def __init__(self, resource: str = "Resource", identifier: Any = None) -> None:
-        if identifier is not None:
-            message = f"{resource} with id '{identifier}' not found."
+    def __init__(self, resource: str = "Resource", identifier: Any = None, message: str = None) -> None:
+        """
+        Trois modes d'utilisation :
+        1. NotFoundException("User", 42) → "User with id '42' not found."
+        2. NotFoundException("Resource") → "Resource not found."
+        3. NotFoundException(message="CV introuvable (id=1)") → message direct
+        """
+        if message is not None:
+            # Support direct message (ex: "CV introuvable (id=1)")
+            super().__init__(message, status.HTTP_404_NOT_FOUND)
+        elif identifier is not None:
+            msg = f"{resource} with id '{identifier}' not found."
+            super().__init__(msg, status.HTTP_404_NOT_FOUND)
         else:
-            message = f"{resource} not found."
-        super().__init__(message, status.HTTP_404_NOT_FOUND)
+            msg = f"{resource} not found."
+            super().__init__(msg, status.HTTP_404_NOT_FOUND)
 
 
 # ── 409 Conflict ──────────────────────────────────────────────────────────────

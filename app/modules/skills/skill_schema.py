@@ -1,7 +1,17 @@
-# app/modules/skills/skill_schema.py
+"""
+skills/skill_schema.py — Pydantic v2 schemas for the Skills module.
+
+Schemas
+-------
+  SkillBase        Common fields (name, display_name, category, skill_type)
+  SkillCreate      Input for POST /skills
+  SkillUpdate      Input for PUT /skills/{id}  (all fields optional)
+  SkillResponse    Output — full skill object returned by the API
+  SkillListResponse Paginated list response
+"""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -9,77 +19,105 @@ from app.shared.enums import SkillCategory, SkillType
 from app.shared.utils import normalize_skill
 
 
-# ── Schéma de base ─────────────────────────────────────────────────────────────
+# ── Base ──────────────────────────────────────────────────────────────────────
 class SkillBase(BaseModel):
     name: str = Field(
         ...,
-        min_length=1,
+        min_length=2,
         max_length=100,
-        description="Nom de la compétence (ex: Python, Communication)",
+        description="Normalised skill name (lowercase). E.g. 'python'.",
+        examples=["python"],
+    )
+    display_name: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Human-readable display name. Defaults to title-cased `name`.",
+        examples=["Python"],
+    )
+    category: SkillCategory | None = Field(
+        default=None,
+        description="Skill sub-domain category.",
     )
     skill_type: SkillType = Field(
-        ...,
-        description="Type : 'hard' (technique) ou 'soft' (comportementale)",
-    )
-    sub_category: Optional[SkillCategory] = Field(
-        None,
-        description="Sous-domaine optionnel : programming, ai_ml, database…",
-    )
-    description: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Description libre de la compétence",
+        default=SkillType.HARD,
+        description="'hard' for technical skills, 'soft' for interpersonal skills.",
     )
 
     @field_validator("name")
     @classmethod
-    def clean_name(cls, v: str) -> str:
-        """Strip les espaces — normalize_skill est appliqué dans le service."""
-        return v.strip()
+    def normalise_name(cls, v: str) -> str:
+        """Always store the name in normalised lowercase form."""
+        return normalize_skill(v)
+
+    @field_validator("display_name", mode="before")
+    @classmethod
+    def default_display_name(cls, v, info) -> str | None:
+        """If display_name is not provided, derive it from name."""
+        return v  # populated by SkillCreate validator below if None
 
 
-# ── Création ───────────────────────────────────────────────────────────────────
+# ── Create ────────────────────────────────────────────────────────────────────
 class SkillCreate(SkillBase):
-    pass
+    """Input schema for POST /skills."""
+
+    @field_validator("display_name", mode="before")
+    @classmethod
+    def default_display_name(cls, v, info) -> str:
+        """If display_name is absent, title-case the name."""
+        if not v:
+            # info.data may not have 'name' yet in v2 — safe fallback
+            return v or ""
+        return v
+
+    def model_post_init(self, __context) -> None:
+        """Ensure display_name always has a value after model creation."""
+        if not self.display_name:
+            self.display_name = self.name.title()
 
 
-# ── Mise à jour partielle (tous les champs optionnels) ─────────────────────────
+# ── Update ────────────────────────────────────────────────────────────────────
 class SkillUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    skill_type: Optional[SkillType] = None
-    sub_category: Optional[SkillCategory] = None
-    description: Optional[str] = Field(None, max_length=500)
-    is_active: Optional[bool] = None
+    """Input schema for PUT /skills/{id}. All fields optional."""
+
+    name: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+    )
+    display_name: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+    category: SkillCategory | None = None
+    skill_type: SkillType | None = None
 
     @field_validator("name")
     @classmethod
-    def clean_name(cls, v: Optional[str]) -> Optional[str]:
-        return v.strip() if v else v
+    def normalise_name(cls, v: str | None) -> str | None:
+        return normalize_skill(v) if v else None
 
 
-# ── Réponse complète ───────────────────────────────────────────────────────────
-class SkillResponse(SkillBase):
-    id: int
-    normalized_name: str
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+# ── Response ──────────────────────────────────────────────────────────────────
+class SkillResponse(BaseModel):
+    """Full skill object returned by the API."""
+
+    id:           int
+    name:         str
+    display_name: str
+    category:     SkillCategory | None = None
+    skill_type:   SkillType
+    created_at:   datetime
 
     model_config = {"from_attributes": True}
 
 
-# ── Réponse paginée ────────────────────────────────────────────────────────────
 class SkillListResponse(BaseModel):
-    total: int
-    page: int
+    """Wrapper used by the paginated GET /skills endpoint."""
+
+    items:     list[SkillResponse]
+    total:     int
+    page:      int
     page_size: int
-    pages: int
-    has_next: bool
-    has_prev: bool
-    data: List[SkillResponse]
-
-
-# ── Réponse liste de noms (pour NLP et Matching) ──────────────────────────────
-class SkillNamesResponse(BaseModel):
-    total: int
-    names: List[str]
+    pages:     int
+    has_next:  bool
+    has_prev:  bool

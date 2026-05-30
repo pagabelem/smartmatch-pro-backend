@@ -14,11 +14,11 @@ Design decisions
 Relationships
 -------------
   User  ──(1:1)──  Profile
+  User  ──(1:N)──  RefreshToken
   User  ──(1:N)──  (Resume, Favorite, etc. — FK defined on those models)
 """
 
 from datetime import datetime, timezone
-
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -31,7 +31,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.database import Base
-
+from typing import TYPE_CHECKING
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _now() -> datetime:
@@ -105,14 +105,17 @@ class User(Base):
         "Profile",
         back_populates="user",
         uselist=False,
-        cascade="all, delete-orphan",   # deleting User also deletes Profile
+        cascade="all, delete-orphan",
         lazy="select",
     )
 
-    # These relationships will be declared in the other modules' models.
-    # Placeholder comments for Alembic / IDE awareness:
-    # resumes: list["Resume"]       → defined in modules/resumes/resume_model.py
-    # favorites: list["Favorite"]   → defined in modules/favorites/favorite_model.py
+    # One User has many RefreshTokens
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        "RefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
 
     # ── Dunder ────────────────────────────────────────────────────────────────
     def __repr__(self) -> str:
@@ -220,6 +223,13 @@ class Profile(Base):
     user: Mapped["User"] = relationship(
         "User",
         back_populates="profile",
+    )
+
+    # ✅ PHASE 4 — Relationship with Resume
+    resumes: Mapped[list["Resume"]] = relationship(
+        "Resume",
+        back_populates="profile",
+        cascade="all, delete-orphan",
     )
 
     # ── Computed helpers ──────────────────────────────────────────────────────
