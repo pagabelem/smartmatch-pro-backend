@@ -12,10 +12,11 @@ from app.config import settings
 from app.database import check_db_connection
 
 # ── Import tous les modèles ────────────────────────────────────────────────────
-from app.modules.users.user_model   import Profile, User        # noqa: F401
-from app.modules.skills.skill_model import Skill                # noqa: F401
-from app.modules.jobs.job_model     import Job                  # noqa: F401
+from app.modules.users.user_model     import Profile, User      # noqa: F401
+from app.modules.skills.skill_model   import Skill              # noqa: F401
+from app.modules.jobs.job_model       import Job                # noqa: F401
 from app.modules.imports.import_model import Import             # noqa: F401
+from app.modules.favorites.favorite_model import Favorite       # noqa: F401
 
 # ── Import des routers ────────────────────────────────────────────────────────
 # from app.modules.auth.auth_router        import router as auth_router
@@ -24,13 +25,13 @@ from app.modules.imports.import_model import Import             # noqa: F401
 # from app.modules.resumes.resume_router   import router as resumes_router
 # from app.modules.nlp.nlp_router          import router as nlp_router
 
-from app.modules.skills.skill_router   import router as skills_router
-from app.modules.jobs.job_router       import router as jobs_router
-from app.modules.imports.import_router import router as imports_router
+from app.modules.skills.skill_router     import router as skills_router
+from app.modules.jobs.job_router         import router as jobs_router
+from app.modules.imports.import_router   import router as imports_router
+from app.modules.favorites.favorite_router import router as favorites_router
 
 # from app.modules.matching.matching_router   import router as matching_router
 # from app.modules.skill_gap.skill_gap_router import router as skill_gap_router
-# from app.modules.favorites.favorite_router  import router as favorites_router
 # from app.modules.dashboard.dashboard_router import router as dashboard_router
 # from app.modules.ai.ai_router               import router as ai_router
 
@@ -83,13 +84,13 @@ def create_app() -> FastAPI:
         )
 
     # ── Routers ────────────────────────────────────────────────────────────────
-    app.include_router(skills_router,  prefix=API_PREFIX)
-    app.include_router(jobs_router,    prefix=API_PREFIX)
-    app.include_router(imports_router, prefix=API_PREFIX)
+    app.include_router(skills_router,    prefix=API_PREFIX)
+    app.include_router(jobs_router,      prefix=API_PREFIX)
+    app.include_router(imports_router,   prefix=API_PREFIX)
+    app.include_router(favorites_router, prefix=API_PREFIX)
 
     # app.include_router(matching_router,  prefix=API_PREFIX)
     # app.include_router(skill_gap_router, prefix=API_PREFIX)
-    # app.include_router(favorites_router, prefix=API_PREFIX)
     # app.include_router(dashboard_router, prefix=API_PREFIX)
     # app.include_router(ai_router,        prefix=API_PREFIX)
 
