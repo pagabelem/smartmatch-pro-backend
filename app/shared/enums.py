@@ -31,86 +31,98 @@ from enum import Enum
 # ── User & Auth ───────────────────────────────────────────────────────────────
 class UserRole(str, Enum):
     """Role assigned to a user account."""
-    STUDENT   = "student"    # default for all registered users
-    ADMIN     = "admin"      # full back-office access
-    MODERATOR = "moderator"  # can manage jobs/skills, no user management
+    STUDENT   = "student"
+    ADMIN     = "admin"
+    MODERATOR = "moderator"
 
 
 class AccountStatus(str, Enum):
     """Lifecycle state of a user account."""
-    ACTIVE    = "active"
-    INACTIVE  = "inactive"   # disabled by admin
-    PENDING   = "pending"    # email not yet verified (V2)
-    BANNED    = "banned"
+    ACTIVE   = "active"
+    INACTIVE = "inactive"
+    PENDING  = "pending"
+    BANNED   = "banned"
 
 
 # ── Profile & Education ───────────────────────────────────────────────────────
 class ProfileStatus(str, Enum):
     """Profile completion status."""
-    DRAFT = "draft"
+    DRAFT     = "draft"
     COMPLETED = "completed"
-    VERIFIED = "verified"
+    VERIFIED  = "verified"
 
 
 class EducationLevel(str, Enum):
     """Education level options."""
-    BACHELOR = "bachelor"
-    MASTER = "master"
-    PHD = "phd"
+    BACHELOR    = "bachelor"
+    MASTER      = "master"
+    PHD         = "phd"
     ENGINEERING = "engineering"
-    OTHER = "other"
+    OTHER       = "other"
 
 
 # ── Job offers ────────────────────────────────────────────────────────────────
 class ContractType(str, Enum):
     """Type of employment contract."""
-    CDI         = "CDI"          # Permanent contract
-    CDD         = "CDD"          # Fixed-term contract
-    STAGE       = "Stage"        # Internship
-    ALTERNANCE  = "Alternance"   # Work-study / apprenticeship
-    FREELANCE   = "Freelance"
-    PART_TIME   = "Part-time"
-    VOLUNTEER   = "Volunteer"
-    OTHER       = "Other"
+    CDI        = "CDI"
+    CDD        = "CDD"
+    STAGE      = "Stage"
+    ALTERNANCE = "Alternance"
+    FREELANCE  = "Freelance"
+    PART_TIME  = "Part-time"
+    VOLUNTEER  = "Volunteer"
+    OTHER      = "Other"
 
 
 class JobStatus(str, Enum):
     """Publication status of a job offer in our database."""
-    ACTIVE    = "active"     # visible to students
-    EXPIRED   = "expired"    # past closing date
-    SUSPENDED = "suspended"  # hidden by admin (suspected fraud, etc.)
-    DRAFT     = "draft"      # imported but not yet validated
+    ACTIVE    = "active"
+    EXPIRED   = "expired"
+    SUSPENDED = "suspended"
+    DRAFT     = "draft"
 
 
 class ExperienceLevel(str, Enum):
     """Required seniority level for a job offer."""
-    JUNIOR     = "junior"     # 0–2 years
-    MID        = "mid"        # 2–5 years
-    SENIOR     = "senior"     # 5–10 years
-    LEAD       = "lead"       # 10+ / team lead
-    INTERNSHIP = "internship" # no experience required
-    ANY        = "any"        # not specified
+    JUNIOR     = "junior"
+    MID        = "mid"
+    SENIOR     = "senior"
+    LEAD       = "lead"
+    INTERNSHIP = "internship"
+    ANY        = "any"
 
 
 class WorkMode(str, Enum):
     """Where the work is performed."""
-    ON_SITE  = "on_site"
-    REMOTE   = "remote"
-    HYBRID   = "hybrid"
-    ANY      = "any"
+    ON_SITE = "on_site"
+    REMOTE  = "remote"
+    HYBRID  = "hybrid"
+    ANY     = "any"
+
+
+class DegreeLevel(str, Enum):
+    """
+    Required education level for a job offer.
+    Added by Membre 2 — used in job_model.py, job_schema.py, import_service.py.
+    """
+    ANY        = "any"
+    BAC        = "bac"
+    BAC_PLUS_2 = "bac+2"
+    BAC_PLUS_3 = "bac+3"
+    BAC_PLUS_5 = "bac+5"
+    MASTER     = "master"
+    DOCTORATE  = "doctorate"
 
 
 # ── Skills ────────────────────────────────────────────────────────────────────
 class SkillType(str, Enum):
     """Broad category of a skill."""
-    HARD = "hard"   # technical, measurable (Python, SQL, TensorFlow…)
-    SOFT = "soft"   # interpersonal, behavioural (communication, leadership…)
+    HARD = "hard"
+    SOFT = "soft"
 
 
 class SkillCategory(str, Enum):
-    """
-    Sub-domain of a hard skill — used by the treemap / dashboard visualisation.
-    """
+    """Sub-domain of a hard skill — used by the treemap / dashboard visualisation."""
     PROGRAMMING  = "programming"
     AI_ML        = "ai_ml"
     NLP          = "nlp"
@@ -137,13 +149,13 @@ class Language(str, Enum):
 # ── Import / Data sources ─────────────────────────────────────────────────────
 class ImportSource(str, Enum):
     """Origin of a job-offer dataset."""
-    CSV          = "csv"
-    JSON         = "json"
-    SCRAPER_REKRUTE    = "scraper_rekrute"
-    SCRAPER_EMPLOI     = "scraper_emploidiali"
-    SCRAPER_INDEED     = "scraper_indeed"
-    SCRAPER_LINKEDIN   = "scraper_linkedin"
-    MANUAL       = "manual"
+    CSV              = "csv"
+    JSON             = "json"
+    SCRAPER_REKRUTE  = "scraper_rekrute"
+    SCRAPER_EMPLOI   = "scraper_emploidiali"
+    SCRAPER_INDEED   = "scraper_indeed"
+    SCRAPER_LINKEDIN = "scraper_linkedin"
+    MANUAL           = "manual"
 
 
 class ImportStatus(str, Enum):
@@ -157,20 +169,20 @@ class ImportStatus(str, Enum):
 # ── Salary ────────────────────────────────────────────────────────────────────
 class SalaryBracket(str, Enum):
     """Salary range brackets."""
-    UNDER_5K    = "< 5 000 DH"
-    FROM_5K_10K = "5 000 – 10 000 DH"
+    UNDER_5K     = "< 5 000 DH"
+    FROM_5K_10K  = "5 000 – 10 000 DH"
     FROM_10K_20K = "10 000 – 20 000 DH"
-    ABOVE_20K   = "> 20 000 DH"
+    ABOVE_20K    = "> 20 000 DH"
     NOT_SPECIFIED = "Non spécifié"
 
 
 # ── Matching ──────────────────────────────────────────────────────────────────
 class MatchScoreLabel(str, Enum):
     """Human-readable label for a match score range."""
-    EXCELLENT  = "Excellent"   # ≥ 80 %
-    GOOD       = "Good"        # 60 – 79 %
-    AVERAGE    = "Average"     # 40 – 59 %
-    LOW        = "Low"         # < 40 %
+    EXCELLENT = "Excellent"
+    GOOD      = "Good"
+    AVERAGE   = "Average"
+    LOW       = "Low"
 
     @classmethod
     def from_score(cls, score: float) -> "MatchScoreLabel":
@@ -187,7 +199,7 @@ class MatchScoreLabel(str, Enum):
 # ── Favorites ─────────────────────────────────────────────────────────────────
 class FavoriteStatus(str, Enum):
     """Status of a favorite job."""
-    ACTIVE = "active"
+    ACTIVE   = "active"
     ARCHIVED = "archived"
 
 
@@ -196,29 +208,29 @@ class NotificationType(str, Enum):
     """Type of notification."""
     JOB_MATCH = "job_match"
     SKILL_GAP = "skill_gap"
-    SYSTEM = "system"
-    REMINDER = "reminder"
+    SYSTEM    = "system"
+    REMINDER  = "reminder"
 
 
 # ── Gender ────────────────────────────────────────────────────────────────────
 class Gender(str, Enum):
     """Gender enumeration."""
-    MALE = "male"
+    MALE   = "male"
     FEMALE = "female"
-    OTHER = "other"
+    OTHER  = "other"
 
 
 # ── Sort Order ────────────────────────────────────────────────────────────────
 class SortOrder(str, Enum):
     """Sort order options."""
-    ASC = "asc"
+    ASC  = "asc"
     DESC = "desc"
 
 
 # ── File Type ─────────────────────────────────────────────────────────────────
 class FileType(str, Enum):
     """Supported file types for resume upload."""
-    PDF = "pdf"
+    PDF  = "pdf"
     DOCX = "docx"
 
 
@@ -226,14 +238,14 @@ class FileType(str, Enum):
 class SkillSource(str, Enum):
     """Source of skill extraction."""
     PROFILE = "profile"
-    RESUME = "resume"
-    MANUAL = "manual"
+    RESUME  = "resume"
+    MANUAL  = "manual"
 
 
 # ── Skill Level ───────────────────────────────────────────────────────────────
 class SkillLevel(str, Enum):
     """Skill proficiency level."""
-    BEGINNER = "beginner"
+    BEGINNER     = "beginner"
     INTERMEDIATE = "intermediate"
-    ADVANCED = "advanced"
-    EXPERT = "expert"
+    ADVANCED     = "advanced"
+    EXPERT       = "expert"
