@@ -25,7 +25,7 @@ from app.core.exceptions import (
     unhandled_exception_handler,
 )
 
-# ── Import all models so Alembic / create_all_tables() can see them ───────────
+# ── Import all models ─────────────────────────────────────────────────────────
 from app.modules.users.user_model import Profile, User                      # noqa: F401
 from app.modules.auth.auth_model import RefreshToken                        # noqa: F401
 from app.modules.skills.skill_model import Skill                            # noqa: F401
@@ -34,8 +34,9 @@ from app.modules.jobs.job_model import Job                                  # no
 from app.modules.imports.import_model import Import                         # noqa: F401
 from app.modules.favorites.favorite_model import Favorite                   # noqa: F401
 from app.modules.matching.recommendation_model import Recommendation        # noqa: F401
+from app.modules.skill_gap.skill_gap_model import SkillGap                  # noqa: F401
 
-# ── Import routers ────────────────────────────────────────────────────────────
+# ── Import all routers ────────────────────────────────────────────────────────
 from app.modules.auth.auth_router import router as auth_router
 from app.modules.skills.skill_router import router as skills_router
 from app.modules.users.user_router import router as users_router
@@ -47,8 +48,9 @@ from app.modules.jobs.job_router import router as jobs_router
 from app.modules.imports.import_router import router as imports_router
 from app.modules.favorites.favorite_router import router as favorites_router
 from app.modules.matching.matching_router import router as matching_router
+from app.modules.skill_gap.skill_gap_router import router as skill_gap_router
 
-# ── Import NLP preload function ───────────────────────────────────────────────
+# ── NLP preload ───────────────────────────────────────────────────────────────
 from app.modules.nlp.nlp_service import preload_nlp_model
 
 API_PREFIX = "/api/v1"
@@ -106,24 +108,25 @@ def create_app() -> FastAPI:
             allowed_hosts=["yourdomain.com", "www.yourdomain.com"],
         )
 
-    # ── Exception handlers ─────────────────────────────────────────────────────
+    # ── Exception handlers ────────────────────────────────────────────────────
     app.add_exception_handler(AppException, app_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
 
     # ── Routers Membre 1 ──────────────────────────────────────────────────────
-    app.include_router(auth_router,     prefix=API_PREFIX, tags=["Authentication"])
-    app.include_router(skills_router,   prefix=API_PREFIX, tags=["Skills"])
-    app.include_router(users_router,    prefix=API_PREFIX, tags=["Users"])
-    app.include_router(profiles_router, prefix=API_PREFIX, tags=["Profiles"])
-    app.include_router(resumes_router,  prefix=API_PREFIX, tags=["Resumes"])
-    app.include_router(nlp_router,      prefix=API_PREFIX, tags=["NLP"])
-    app.include_router(storage_router,  prefix=API_PREFIX, tags=["Storage"])
+    app.include_router(auth_router,      prefix=API_PREFIX, tags=["Authentication"])
+    app.include_router(skills_router,    prefix=API_PREFIX, tags=["Skills"])
+    app.include_router(users_router,     prefix=API_PREFIX, tags=["Users"])
+    app.include_router(profiles_router,  prefix=API_PREFIX, tags=["Profiles"])
+    app.include_router(resumes_router,   prefix=API_PREFIX, tags=["Resumes"])
+    app.include_router(nlp_router,       prefix=API_PREFIX, tags=["NLP"])
+    app.include_router(storage_router,   prefix=API_PREFIX, tags=["Storage"])
 
     # ── Routers Membre 2 ──────────────────────────────────────────────────────
-    app.include_router(jobs_router,     prefix=API_PREFIX, tags=["Jobs"])
-    app.include_router(imports_router,  prefix=API_PREFIX, tags=["Imports"])
-    app.include_router(favorites_router,prefix=API_PREFIX, tags=["Favorites"])
-    app.include_router(matching_router, prefix=API_PREFIX, tags=["Matching"])
+    app.include_router(jobs_router,       prefix=API_PREFIX, tags=["Jobs"])
+    app.include_router(imports_router,    prefix=API_PREFIX, tags=["Imports"])
+    app.include_router(favorites_router,  prefix=API_PREFIX, tags=["Favorites"])
+    app.include_router(matching_router,   prefix=API_PREFIX, tags=["Matching"])
+    app.include_router(skill_gap_router,  prefix=API_PREFIX, tags=["Skill Gap"])
 
     return app
 
