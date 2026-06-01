@@ -49,6 +49,8 @@ from app.modules.imports.import_router import router as imports_router
 from app.modules.favorites.favorite_router import router as favorites_router
 from app.modules.matching.matching_router import router as matching_router
 from app.modules.skill_gap.skill_gap_router import router as skill_gap_router
+from app.modules.dashboard.dashboard_router import router as dashboard_router
+from app.modules.ai.ai_router import router as ai_router
 
 # ── NLP preload ───────────────────────────────────────────────────────────────
 from app.modules.nlp.nlp_service import preload_nlp_model
@@ -58,7 +60,6 @@ API_PREFIX = "/api/v1"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # ── Startup ───────────────────────────────────────────────────────────────
     print(f"🚀  Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     print(f"    Environment : {settings.ENVIRONMENT}")
     print(f"    Database    : {settings.DATABASE_URL}")
@@ -69,12 +70,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "Run 'alembic upgrade head' to create the tables."
         )
     print("    Database    : ✓ connection OK")
-
     preload_nlp_model()
-
     yield
-
-    # ── Shutdown ──────────────────────────────────────────────────────────────
     print(f"🛑  Shutting down {settings.APP_NAME}")
 
 
@@ -127,6 +124,8 @@ def create_app() -> FastAPI:
     app.include_router(favorites_router,  prefix=API_PREFIX, tags=["Favorites"])
     app.include_router(matching_router,   prefix=API_PREFIX, tags=["Matching"])
     app.include_router(skill_gap_router,  prefix=API_PREFIX, tags=["Skill Gap"])
+    app.include_router(dashboard_router,  prefix=API_PREFIX, tags=["Dashboard"])
+    app.include_router(ai_router,         prefix=API_PREFIX, tags=["IA — Intelligence Artificielle"])
 
     return app
 
@@ -139,7 +138,6 @@ app = create_app()
     "/health",
     tags=["System"],
     summary="Health check",
-    description="Returns the operational status of the API and its dependencies.",
 )
 def health_check() -> JSONResponse:
     db_ok = check_db_connection()
