@@ -17,7 +17,7 @@ Relationships
   User  ──(1:N)──  RefreshToken
   User  ──(1:N)──  (Resume, Favorite, etc. — FK defined on those models)
 """
-
+from pydantic import BaseModel
 from datetime import datetime, timezone
 from sqlalchemy import (
     Boolean,
@@ -239,6 +239,20 @@ class Profile(Base):
         parts = filter(None, [self.first_name, self.last_name])
         return " ".join(parts) or "—"
 
+    @full_name.setter
+    def full_name(self, value: str) -> None:
+        """
+        Intercepte et découpe la chaîne de caractères fournie à l'initialisation
+        ou lors d'une modification pour peupler les colonnes réelles en base de données.
+        """
+        if value:
+            parts = value.strip().split(" ", 1)
+            self.first_name = parts[0]
+            self.last_name = parts[1] if len(parts) > 1 else None
+        else:
+            self.first_name = None
+            self.last_name = None
+
     @property
     def all_skills(self) -> list[str]:
         """
@@ -265,3 +279,11 @@ class Profile(Base):
             f"<Profile id={self.id} user_id={self.user_id} "
             f"name={self.full_name!r}>"
         )
+    
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    # ...
+    class Config:
+        from_attributes = True # Important pour SQLAlchemy    

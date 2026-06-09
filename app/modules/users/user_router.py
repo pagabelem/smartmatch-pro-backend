@@ -1,163 +1,119 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-from app.dependencies import get_db, get_current_user
-from app.modules.users.user_model import User as UserModel
-from app.modules.users.user_schema import (
-    UserResponse, 
-    UserUpdate, 
-    UserListResponse
-)
-from app.modules.users.user_service import UserService
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Dict, Any
+from app.database import get_db
 
+from app.modules.auth.dependencies import get_current_active_user, get_current_superuser
+from app.modules.users.user_model import User
+from app.modules.users.user_schema import UserResponse, UserUpdate
+from app.modules.users.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.get("/", response_model=UserListResponse)
-def get_all_users(
-    page: int = Query(1, ge=1, description="Numéro de la page"),
-    limit: int = Query(20, ge=1, le=100, description="Nombre d'items par page"),
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Récupère tous les utilisateurs (admin uniquement)
-    """
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accès réservé aux administrateurs"
-        )
-    
-    user_service = UserService(db)
-    users, total = user_service.get_all_users(page=page, limit=limit)
-    
-    return UserListResponse(
-        items=[UserResponse.model_validate(user) for user in users],
-        total=total,
-        page=page,
-        limit=limit
-    )
-
-
 @router.get("/me", response_model=UserResponse)
-def get_current_user_info(
-    current_user: UserModel = Depends(get_current_user)
+async def get_current_user_info(
+    current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Récupère les informations de l'utilisateur connecté
-    """
+    """Récupère les informations de l'utilisateur connecté."""
     return UserResponse.model_validate(current_user)
 
 
-@router.get("/search", response_model=UserListResponse)
-def search_users(
-    q: str = Query(..., min_length=1, description="Terme de recherche"),
-    page: int = Query(1, ge=1, description="Numéro de la page"),
-    limit: int = Query(20, ge=1, le=100, description="Nombre d'items par page"),
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
+@router.get("/search", response_model=Dict[str, Any])
+async def search_users(
+    email: str = Query(None),
+    limit: int = Query(10),
+    offset: int = Query(0),
+    current_user: User = Depends(get_current_superuser),
+    db: AsyncSession = Depends(get_db),
 ):
-    """
-    Recherche des utilisateurs par email
-    """
+    """Recherche des utilisateurs (admin uniquement)."""
     user_service = UserService(db)
-    users, total = user_service.search_users(
-        search_term=q, 
-        page=page, 
-        limit=limit
-    )
-    
-    return UserListResponse(
-        items=[UserResponse.model_validate(user) for user in users],
-        total=total,
-        page=page,
-        limit=limit
-    )
+    users, total = await user_service.search_users(email=email, limit=limit, offset=offset)
+    return {
+        "users": [UserResponse.model_validate(u) for u in users],
+        "total": total,
+    }
+
+
+@router.get("", response_model=Dict[str, Any])
+async def list_users(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1),
+    current_user: User = Depends(get_current_superuser),
+    db: AsyncSession = Depends(get_db),
+):
+    """Récupère la liste de tous les utilisateurs (admin uniquement)."""
+    user_service = UserService(db)
+    users, total = await user_service.get_all_users(page=page, limit=limit)
+    return {
+        "users": [UserResponse.model_validate(u) for u in users],
+        "total": total,
+    }
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-def get_user_by_id(
+async def get_user_by_id(
     user_id: int,
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """
-    Récupère un utilisateur par son ID
-    """
-    user_service = UserService(db)
-    user = user_service.get_user_by_id(user_id)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Utilisateur non trouvé"
-        )
-    
+    """Récupère un utilisateur spécifique par son ID."""
     if current_user.id != user_id and not current_user.is_superuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accès non autorisé"
+            detail="Vous n'êtes pas autorisé à voir ce profil.",
         )
-    
+    user_service = UserService(db)
+    user = await user_service.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Utilisateur non trouvé.",
+        )
     return UserResponse.model_validate(user)
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-def update_user(
+async def update_user(
     user_id: int,
-    user_update: UserUpdate,
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    payload: UserUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """
-    Met à jour un utilisateur (seul l'email peut être modifié)
-    """
+    """Met à jour un utilisateur."""
     if current_user.id != user_id and not current_user.is_superuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous ne pouvez modifier que vos propres informations"
+            detail="Vous n'êtes pas autorisé à modifier cet utilisateur.",
         )
-    
     user_service = UserService(db)
-    user = user_service.update_user(user_id, user_update)
-    
-    if not user:
+    updated_user = await user_service.update_user(user_id, payload)
+    if not updated_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Utilisateur non trouvé"
+            detail="Utilisateur non trouvé.",
         )
-    
-    return UserResponse.model_validate(user)
+    return UserResponse.model_validate(updated_user)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(
+async def delete_user(
     user_id: int,
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """
-    Soft delete d'un utilisateur (admin uniquement)
-    """
-    if not current_user.is_superuser:
+    """Supprime (soft delete) un utilisateur."""
+    if current_user.id != user_id and not current_user.is_superuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Seuls les administrateurs peuvent supprimer des utilisateurs"
+            detail="Action interdite.",
         )
-    
-    if current_user.id == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Vous ne pouvez pas vous supprimer vous-même"
-        )
-    
     user_service = UserService(db)
-    deleted = user_service.delete_user(user_id)
-    
-    if not deleted:
+    success = await user_service.delete_user(user_id)
+    if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Utilisateur non trouvé"
+            detail="Utilisateur non trouvé.",
         )
+    return None

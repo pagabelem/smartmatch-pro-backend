@@ -26,22 +26,22 @@ from app.core.exceptions import (
 )
 
 # ── Import all models so Alembic / create_all_tables() can see them ───────────
-from app.modules.users.user_model import Profile, User      # noqa: F401
-from app.modules.auth.auth_model import RefreshToken        # noqa: F401
-from app.modules.skills.skill_model import Skill            # noqa: F401
-from app.modules.resumes.resume_model import Resume         # noqa: F401 ✅ PHASE 4
+from app.modules.users.user_model import Profile, User          # noqa: F401
+from app.modules.auth.auth_model import RefreshToken            # noqa: F401
+from app.modules.skills.skill_model import Skill                # noqa: F401
+from app.modules.resumes.resume_model import Resume             # noqa: F401  ✅ PHASE 4
 
 # ── Import routers ────────────────────────────────────────────────────────────
 from app.modules.auth.auth_router import router as auth_router
 from app.modules.skills.skill_router import router as skills_router
 from app.modules.users.user_router import router as users_router
 from app.modules.profiles.profile_router import router as profiles_router
-from app.modules.resumes.resume_router import router as resumes_router  # ✅ PHASE 4
-from app.modules.nlp.nlp_router import router as nlp_router            # ✅ PHASE 5
-from app.modules.storage.storage_router import router as storage_router  # ✅ PHASE 6
+from app.modules.resumes.resume_router import router as resumes_router          # ✅ PHASE 4
+from app.modules.nlp.nlp_router import router as nlp_router                    # ✅ PHASE 5
+from app.modules.storage.storage_router import router as storage_router         # ✅ PHASE 6
 
 # ── Import NLP preload function ───────────────────────────────────────────────
-from app.modules.nlp.nlp_service import preload_nlp_model  # ✅ PHASE 5
+from app.modules.nlp.nlp_service import preload_nlp_model                      # ✅ PHASE 5
 
 API_PREFIX = "/api/v1"
 
@@ -103,29 +103,28 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Trusted Host (Production)
+    # Trusted Host (production uniquement)
     if settings.ENVIRONMENT == "production":
         app.add_middleware(
             TrustedHostMiddleware,
             allowed_hosts=["yourdomain.com", "www.yourdomain.com"],
         )
 
-    # ── Exception handlers ────────────────────────────────────────────────
+    # ── Exception handlers ────────────────────────────────────────────────────
     app.add_exception_handler(AppException, app_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
 
     # ── Routers ───────────────────────────────────────────────────────────────
-    
-    # Chaque routeur a déjà son propre préfixe interne (ex: "/auth", "/users", etc.)
-    # On ne met donc PAS de préfixe supplémentaire ici
-    
-    app.include_router(auth_router, prefix=API_PREFIX, tags=["Authentication"])
-    app.include_router(skills_router, prefix=API_PREFIX, tags=["Skills"])
-    app.include_router(users_router, prefix=API_PREFIX, tags=["Users"])
+    # Chaque routeur a déjà son propre préfixe interne (ex: "/auth", "/users"…)
+    # On ajoute uniquement le préfixe global /api/v1 ici.
+
+    app.include_router(auth_router,     prefix=API_PREFIX, tags=["Authentication"])
+    app.include_router(skills_router,   prefix=API_PREFIX, tags=["Skills"])
+    app.include_router(users_router,    prefix=API_PREFIX, tags=["Users"])
     app.include_router(profiles_router, prefix=API_PREFIX, tags=["Profiles"])
-    app.include_router(resumes_router, prefix=API_PREFIX, tags=["Resumes"])  # ✅ PHASE 4
-    app.include_router(nlp_router, prefix=API_PREFIX, tags=["NLP"])          # ✅ PHASE 5
-    app.include_router(storage_router, prefix=API_PREFIX, tags=["Storage"])  # ✅ PHASE 6
+    app.include_router(resumes_router,  prefix=API_PREFIX, tags=["Resumes"])   # ✅ PHASE 4
+    app.include_router(nlp_router,      prefix=API_PREFIX, tags=["NLP"])       # ✅ PHASE 5
+    app.include_router(storage_router,  prefix=API_PREFIX, tags=["Storage"])   # ✅ PHASE 6
 
     return app
 

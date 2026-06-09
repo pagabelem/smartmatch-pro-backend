@@ -9,6 +9,7 @@ Services métier pour le module Resumes :
 import os
 import math
 import logging
+import inspect
 from pathlib import Path
 
 import aiofiles
@@ -88,7 +89,7 @@ async def save_resume_file(
     safe_name = sanitize_filename(Path(original_name).stem)
     unique_name = f"{safe_name}_{generate_uuid()}.{ext}"
 
-    # ✅ CORRIGÉ : Chemin relatif stocké en BDD (sans "uploads/" pour éviter double dossier)
+    # ✅ Chemin relatif stocké en BDD
     relative_path = f"resumes/{profile_id}/{unique_name}"
     absolute_path = Path(settings.UPLOAD_DIR) / relative_path
 
@@ -122,7 +123,7 @@ def extract_raw_text(absolute_path: str, mime_type: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 async def create_resume_record(
-    db: AsyncSession,
+    db,  # Typage assoupli pour accepter Session (sync) ou AsyncSession (async)
     profile_id: int,
     filename: str,
     file_path: str,
@@ -130,7 +131,7 @@ async def create_resume_record(
     mime_type: str,
     raw_text: str | None,
 ) -> Resume:
-    """Insère un enregistrement Resume en base."""
+    """Insère un enregistrement Resume en base de manière adaptative sync/async."""
     resume = Resume(
         profile_id=profile_id,
         filename=filename,
@@ -141,8 +142,15 @@ async def create_resume_record(
         is_parsed=raw_text is not None,
     )
     db.add(resume)
-    await db.commit()
-    await db.refresh(resume)
+    
+    # Gestion adaptative du commit et du refresh
+    if hasattr(db, "commit") and inspect.iscoroutinefunction(db.commit):
+        await db.commit()
+        await db.refresh(resume)
+    else:
+        db.commit()
+        db.refresh(resume)
+        
     logger.info("Resume#%d créé en BDD pour profile#%d", resume.id, profile_id)
     return resume
 
@@ -198,12 +206,8 @@ async def get_latest_resume(
     return result.scalar_one_or_none()
 
 
-async def delete_resume(db: AsyncSession, resume_id: int) -> None:
-    """Supprime le fichier physique puis l'enregistrement BDD.
-
-    Raises:
-        NotFoundException: si le CV n'existe pas.
-    """
+async def delete_resume(db, resume_id: int) -> None:
+    """Supprime le fichier physique puis l'enregistrement BDD de manière adaptative."""
     resume = await get_resume_by_id(db, resume_id)
 
     # Suppression physique
@@ -217,9 +221,14 @@ async def delete_resume(db: AsyncSession, resume_id: int) -> None:
     else:
         logger.warning("Fichier physique déjà absent : %s", absolute_path)
 
-    # Suppression BDD
-    await db.delete(resume)
-    await db.commit()
+    # Suppression BDD adaptative
+    if hasattr(db, "delete") and inspect.iscoroutinefunction(db.commit):
+        await db.delete(resume)
+        await db.commit()
+    else:
+        db.delete(resume)
+        db.commit()
+        
     logger.info("Resume#%d supprimé de la BDD", resume_id)
 
 

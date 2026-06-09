@@ -22,7 +22,6 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 # ── Make sure the project root is on sys.path ─────────────────────────────────
-# This lets Alembic find `app.*` imports when run from any directory.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -31,18 +30,22 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.config import settings  # noqa: E402
 
 # ── Import Base FIRST, then every model module ────────────────────────────────
-# Alembic autogenerate works by inspecting Base.metadata.
-# A model is only registered on metadata when its module is imported.
-# Add a new import here every time you create a new model file.
-from app.database import Base  # noqa: E402 — registers the metadata object
+from app.database import Base  # noqa: E402
 
-# Phase 0 models (always import)
+# Phase 0-3 models (always import)
 from app.modules.users.user_model import Profile, User  # noqa: F401, E402
+from app.modules.auth.auth_model import RefreshToken  # noqa: F401, E402
 
-# Uncomment as you build each phase:
-# from app.modules.resumes.resume_model   import Resume        # Phase 4
-# from app.modules.skills.skill_model     import Skill         # Phase 5 dep.
-# from app.modules.jobs.job_model         import Job           # Membre 2
+# ✅ PHASE 4 — Resumes
+from app.modules.resumes.resume_model import Resume  # noqa: F401, E402
+
+# ✅ PHASE 5 — Skills + NLP
+from app.modules.skills.skill_model import Skill  # noqa: F401, E402
+
+# Phase 6 — Storage (no model, just service)
+
+# Membre 2 models (uncomment when available)
+# from app.modules.jobs.job_model import Job
 # from app.modules.matching.recommendation_model import Recommendation
 # from app.modules.skill_gap.skill_gap_model import SkillGapResult
 # from app.modules.favorites.favorite_model import Favorite
@@ -51,7 +54,6 @@ from app.modules.users.user_model import Profile, User  # noqa: F401, E402
 config = context.config
 
 # Override the sqlalchemy.url from alembic.ini with the value from .env
-# This is the recommended approach — a single source of truth.
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Interpret the config file for Python logging
@@ -66,11 +68,6 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """
     Run migrations in 'offline' mode.
-
-    This mode generates a SQL script that can be reviewed / applied manually.
-    Useful for production environments where direct DB access is restricted.
-
-    Run with: alembic upgrade head --sql > migration.sql
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -78,7 +75,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        compare_type=True,       # detect column type changes
+        compare_type=True,
         compare_server_default=True,
     )
     with context.begin_transaction():
@@ -89,13 +86,11 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """
     Run migrations in 'online' mode.
-
-    This is the standard mode used by `alembic upgrade head`.
     """
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
-        poolclass=pool.NullPool,   # no pool needed for one-off migration runs
+        poolclass=pool.NullPool,
     )
 
     with connectable.connect() as connection:

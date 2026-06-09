@@ -4,9 +4,10 @@ Endpoints REST pour le module Resumes.
 """
 
 import logging
+import asyncio
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, UploadFile, File, Query, status
+from fastapi import APIRouter, Depends, UploadFile, File, Query, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
@@ -15,8 +16,9 @@ from app.config import settings
 from app.core.exceptions import ForbiddenException, NotFoundException
 from app.core.responses import success_response, error_response
 from app.database import get_db
-from app.modules.auth.dependencies import get_current_user
-from app.modules.users.user_model import User
+# ✅ Correction : On importe get_current_active_user pour bloquer les requêtes non authentifiées
+from app.modules.auth.dependencies import get_current_active_user
+from app.modules.users.user_model import User, Profile
 from app.modules.resumes import resume_service as svc
 from app.modules.resumes.resume_schema import (
     ResumeUploadResponse,
@@ -29,20 +31,36 @@ router = APIRouter(prefix="/resumes", tags=["Resumes"])
 
 
 # ---------------------------------------------------------------------------
-# Helper
+# Helpers
 # ---------------------------------------------------------------------------
+
+def _is_async(db: AsyncSession) -> bool:
+    """Vérifie si la session actuelle est asynchrone."""
+    return hasattr(db, "execute_with_context") or asyncio.iscoroutinefunction(db.execute)
+
 
 async def _assert_owner_or_admin(
     resume_profile_id: int, 
-    current_user: User, 
+    current_user: User | None, 
     db: AsyncSession
 ) -> None:
     """Vérifie que l'utilisateur est propriétaire du profil ou admin."""
-    result = await db.execute(
-        select(User).where(User.id == current_user.id).options(selectinload(User.profile))
-    )
-    user_with_profile = result.scalar_one()
+    # ✅ Sécurité si la dépendance n'a pas levé d'erreur (ex: routeur mal configuré)
+    if not current_user:
+        raise ForbiddenException("Authentification requise pour accéder à ce CV.")
+        
+    stmt = select(User).where(User.id == current_user.id).options(selectinload(User.profile))
     
+    if _is_async(db):
+        result = await db.execute(stmt)
+    else:
+        result = db.execute(stmt)
+        
+    user_with_profile = result.scalar_one_or_none()
+    
+    if not user_with_profile:
+        raise ForbiddenException("Utilisateur introuvable.")
+        
     is_owner = (
         user_with_profile.profile is not None
         and user_with_profile.profile.id == resume_profile_id
@@ -73,18 +91,27 @@ async def test_resumes_route():
 async def upload_resume(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    # ✅ Correction : Dépendance stricte appliquée
+    current_user: User = Depends(get_current_active_user),
 ):
     """Upload un CV et extrait son texte brut."""
-    result = await db.execute(
-        select(User).where(User.id == current_user.id).options(selectinload(User.profile))
-    )
-    current_user = result.scalar_one()
+    # ✅ Exécution adaptative (async/sync) et extraction propre du scalaire
+    stmt = select(User).where(User.id == current_user.id).options(selectinload(User.profile))
     
-    if current_user.profile is None:
+    if _is_async(db):
+        result = await db.execute(stmt)
+    else:
+        result = db.execute(stmt)
+        
+    current_user_fetched = result.scalar_one_or_none()
+    
+    if not current_user_fetched:
+        return error_response("Utilisateur non trouvé.", code=404)
+    
+    if current_user_fetched.profile is None:
         return error_response("Vous devez d'abord créer un profil.", code=400)
 
-    profile_id = current_user.profile.id
+    profile_id = current_user_fetched.profile.id
 
     file_path, file_size, mime_type = await svc.save_resume_file(file, profile_id)
     absolute_path = str(Path(settings.UPLOAD_DIR) / file_path)
@@ -126,9 +153,20 @@ async def list_resumes_by_profile(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    # ✅ Correction : Dépendance stricte appliquée
+    current_user: User = Depends(get_current_active_user),
 ):
     """Liste paginée des CVs d'un profil."""
+    # ✅ Correction : Vérifier l'existence réelle du profil pour renvoyer une 404 si manquant
+    stmt_profile = select(Profile).where(Profile.id == profile_id)
+    if _is_async(db):
+        profile_check = await db.execute(stmt_profile)
+    else:
+        profile_check = db.execute(stmt_profile)
+        
+    if not profile_check.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Profile not found")
+
     await _assert_owner_or_admin(profile_id, current_user, db)
 
     items, total = await svc.get_resumes_by_profile(db, profile_id, page, limit)
@@ -157,7 +195,8 @@ async def list_resumes_by_profile(
 async def get_resume(
     resume_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    # ✅ Correction : Dépendance stricte appliquée
+    current_user: User = Depends(get_current_active_user),
 ):
     """Retourne les métadonnées complètes d'un CV."""
     resume = await svc.get_resume_by_id(db, resume_id)
@@ -180,7 +219,8 @@ async def get_resume(
 async def get_resume_text(
     resume_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    # ✅ Correction : Dépendance stricte appliquée
+    current_user: User = Depends(get_current_active_user),
 ):
     """Retourne le champ `raw_text` du CV."""
     resume = await svc.get_resume_by_id(db, resume_id)
@@ -206,7 +246,8 @@ async def get_resume_text(
 async def delete_resume(
     resume_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    # ✅ Correction : Dépendance stricte appliquée
+    current_user: User = Depends(get_current_active_user),
 ):
     """Suppression complète d'un CV (fichier + BDD)."""
     resume = await svc.get_resume_by_id(db, resume_id)

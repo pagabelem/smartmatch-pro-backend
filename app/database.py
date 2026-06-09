@@ -2,7 +2,7 @@
 database.py — SQLAlchemy engine, session factory, and declarative Base.
 """
 
-from typing import TYPE_CHECKING
+from typing import AsyncGenerator
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -27,7 +27,6 @@ sync_engine = create_engine(
 
 
 # ── Async Engine (for FastAPI async routes) ──────────────────────────────────
-# Construire l'URL async correctement
 if "postgresql+asyncpg" in settings.DATABASE_URL:
     async_database_url = settings.DATABASE_URL
 elif "postgresql+psycopg2" in settings.DATABASE_URL:
@@ -80,11 +79,7 @@ class Base(DeclarativeBase):
 
 
 # ── Dependency for FastAPI routes ────────────────────────────────────────────
-async def get_db() -> AsyncSession:
-    """
-    FastAPI dependency that provides an async database session.
-    Usage: db: AsyncSession = Depends(get_db)
-    """
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -98,17 +93,14 @@ async def get_db() -> AsyncSession:
 
 # ── Utility functions ────────────────────────────────────────────────────────
 def create_all_tables() -> None:
-    """Create all tables registered on Base.metadata."""
     Base.metadata.create_all(bind=sync_engine)
 
 
 def drop_all_tables() -> None:
-    """Drop all tables."""
     Base.metadata.drop_all(bind=sync_engine)
 
 
 def check_db_connection() -> bool:
-    """Return True if PostgreSQL is reachable, False otherwise."""
     try:
         with sync_engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -118,7 +110,6 @@ def check_db_connection() -> bool:
 
 
 async def check_db_connection_async() -> bool:
-    """Async version of check_db_connection for async contexts."""
     try:
         async with async_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
@@ -126,8 +117,4 @@ async def check_db_connection_async() -> bool:
     except Exception:
         return False
 
-
-# ── IMPORT MODELS AFTER BASE (with TYPE_CHECKING to avoid circular) ──────────
-if not TYPE_CHECKING:
-    from app.modules.users.user_model import User, Profile  # noqa: F401, E402
-    # NE PAS IMPORTER RefreshToken ICI pour éviter l'import circulaire
+# Fin du fichier : AUCUN import de modèle ici.

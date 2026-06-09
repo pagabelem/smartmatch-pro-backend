@@ -1,25 +1,18 @@
 """
 app/modules/nlp/nlp_router.py
 Endpoints REST pour le module NLP.
-
-Routes :
-  POST   /api/v1/nlp/process/{resume_id}        — Lancer l'extraction sur un CV
-  POST   /api/v1/nlp/process/profile/{profile_id} — Traiter tous les CVs d'un profil
-  GET    /api/v1/nlp/status/{resume_id}         — Statut du parsing NLP
-  GET    /api/v1/nlp/skills/{profile_id}        — Compétences extraites d'un profil
-  POST   /api/v1/nlp/extract-text               — Extraction sur texte libre (debug)
 """
 
 import logging
-from fastapi import APIRouter, Depends, status
+import time
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.responses import success_response, error_response
-from app.core.exceptions import NotFoundException, ForbiddenException
 from app.database import get_db
 from app.modules.auth.dependencies import get_current_user
-from app.modules.users.user_model import User, Profile  # ✅ CORRIGÉ
+from app.modules.users.user_model import User, Profile
 from app.modules.nlp import nlp_service as svc
 from app.modules.nlp.nlp_schema import (
     NLPProcessResponse,
@@ -45,7 +38,7 @@ async def _check_profile_permission(
 ) -> None:
     """
     Vérifie que l'utilisateur a le droit d'accéder au profil.
-    Propriétaire ou admin uniquement.
+    Propriétaire ou admin uniquement. Lève de vraies exceptions HTTP pour Pytest.
     """
     result = await db.execute(
         select(Profile).where(Profile.id == profile_id)
@@ -53,11 +46,17 @@ async def _check_profile_permission(
     profile = result.scalar_one_or_none()
 
     if profile is None:
-        raise NotFoundException(message=f"Profil {profile_id} introuvable")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Profil {profile_id} introuvable"
+        )
 
     is_owner = profile.user_id == current_user.id
     if not (is_owner or current_user.is_superuser):
-        raise ForbiddenException("Vous n'avez pas accès à ce profil.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous n'avez pas accès à ce profil."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -81,14 +80,20 @@ async def process_resume(
     resume = result.scalar_one_or_none()
 
     if resume is None:
-        return error_response(f"CV {resume_id} introuvable", code=404)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"CV {resume_id} introuvable"
+        )
 
     await _check_profile_permission(resume.profile_id, current_user, db)
 
     result_data = await svc.process_resume(resume_id, db)
 
-    if result_data["status"] == "error":
-        return error_response(result_data.get("message", "Erreur lors du traitement"), code=500)
+    if result_data.get("status") == "error":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result_data.get("message", "Erreur lors du traitement")
+        )
 
     return success_response(
         data=NLPProcessResponse(**result_data).model_dump(),
@@ -142,7 +147,10 @@ async def get_nlp_status(
     resume = result.scalar_one_or_none()
 
     if resume is None:
-        return error_response(f"CV {resume_id} introuvable", code=404)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"CV {resume_id} introuvable"
+        )
 
     await _check_profile_permission(resume.profile_id, current_user, db)
 
@@ -191,10 +199,13 @@ async def extract_text_debug(
     payload: NLPExtractTextRequest,
     current_user: User = Depends(get_current_user),
 ):
+    # Sécurisation du rôle Admin (Le 401 est géré en amont par get_current_user)
     if not current_user.is_superuser:
-        raise ForbiddenException("Endpoint réservé aux administrateurs.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Endpoint réservé aux administrateurs."
+        )
 
-    import time
     start = time.perf_counter()
 
     skills = svc.extract_text_debug(payload.text)

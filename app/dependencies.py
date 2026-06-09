@@ -1,94 +1,53 @@
-"""
-dependencies.py — FastAPI dependency functions.
-
-These are injected into route handlers via Depends().
-
-Usage
------
-  from app.dependencies import get_db, get_current_user
-  from sqlalchemy.orm import Session
-  from fastapi import Depends
-
-  @router.get("/me")
-  def read_me(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-      ...
-"""
-
-from typing import Generator
-
-from fastapi import Depends, HTTPException, status
+from typing import AsyncGenerator, Annotated, Optional
+from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import SessionLocal
+from app.database import get_db as get_async_db
 from app.core.exceptions import UnauthorizedException, ForbiddenException
+from app.modules.users.user_model import User
+from app.modules.auth.auth_service import get_current_user_from_token
 
-# ── OAuth2 scheme (tells Swagger UI where to get the token) ───────────────────
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async for session in get_async_db():
+        yield session
 
-# ── Database session ──────────────────────────────────────────────────────────
-def get_db() -> Generator[Session, None, None]:
-    """
-    Yield a SQLAlchemy Session for the duration of a single request,
-    then close it automatically — even if an exception occurs.
+async def get_current_user(
+    db: AsyncSession = Depends(get_db),
+    token: Optional[str] = Depends(oauth2_scheme),
+) -> User:
+    if not token:
+        raise UnauthorizedException("Not authenticated")
+        
+    user = await get_current_user_from_token(db, token)
+    if not user:
+        raise UnauthorizedException("Could not validate credentials")
+    
+    # Remplacé 'refresh' par une simple vérification d'état si nécessaire.
+    # Dans 99% des cas, si l'utilisateur est retourné par le service, il est valide.
+    return user
 
-    Usage:
-        @router.get("/items")
-        def list_items(db: Session = Depends(get_db)):
-            return db.query(Item).all()
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# ── Current authenticated user ────────────────────────────────────────────────
-def get_current_user(
-    db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme),
-):
-    """
-    Decode the JWT bearer token and return the authenticated User.
-
-    Raises HTTP 401 if the token is invalid or the user no longer exists.
-    """
-    from app.modules.auth.auth_service import get_current_user_from_token
-    return get_current_user_from_token(db, token)
-
-
-def get_current_active_user(current_user = Depends(get_current_user)):
-    """Same as get_current_user but also enforces is_active=True."""
-    if not getattr(current_user, "is_active", True):
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    # Utilisation explicite de l'attribut is_active
+    if not current_user.is_active:
         raise UnauthorizedException("Account is deactivated.")
     return current_user
 
-
-def get_current_admin_user(current_user = Depends(get_current_user)):
-    """Restrict endpoint to admin users (is_superuser=True)."""
-    if not getattr(current_user, "is_superuser", False):
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    if not current_user.is_superuser:
         raise ForbiddenException("Admin access required.")
     return current_user
 
+# Alias propres pour les routes
+CurrentUser = Annotated[User, Depends(get_current_active_user)]
+AdminUser = Annotated[User, Depends(get_current_admin_user)]
 
-def get_current_superuser(current_user = Depends(get_current_user)):
-    """Alias for get_current_admin_user."""
-    return get_current_admin_user(current_user)
-
-# app/dependencies.py - ajoute cette fonction
-
-def get_db_session():
-    """Return database session without type annotation for FastAPI."""
-    return get_db()
-
-# app/dependencies.py
-from app.database import SessionLocal
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Simplification totale pour le superuser
+async def get_current_superuser(user: AdminUser) -> User:
+    return user
