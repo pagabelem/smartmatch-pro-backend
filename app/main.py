@@ -29,7 +29,8 @@ from app.core.exceptions import (
 from app.modules.users.user_model import Profile, User          # noqa: F401
 from app.modules.auth.auth_model import RefreshToken            # noqa: F401
 from app.modules.skills.skill_model import Skill                # noqa: F401
-from app.modules.resumes.resume_model import Resume             # noqa: F401  ✅ PHASE 4
+from app.modules.resumes.resume_model import Resume             # noqa: F401   ✅ PHASE 4
+from app.modules.jobs.job_model import Job                      # noqa: F401   ✅ MODULE JOBS
 
 # ── Import routers ────────────────────────────────────────────────────────────
 from app.modules.auth.auth_router import router as auth_router
@@ -39,6 +40,7 @@ from app.modules.profiles.profile_router import router as profiles_router
 from app.modules.resumes.resume_router import router as resumes_router          # ✅ PHASE 4
 from app.modules.nlp.nlp_router import router as nlp_router                    # ✅ PHASE 5
 from app.modules.storage.storage_router import router as storage_router         # ✅ PHASE 6
+from app.modules.jobs.job_router import router as jobs_router                  # ✅ MODULE JOBS
 
 # ── Import NLP preload function ───────────────────────────────────────────────
 from app.modules.nlp.nlp_service import preload_nlp_model                      # ✅ PHASE 5
@@ -125,6 +127,7 @@ def create_app() -> FastAPI:
     app.include_router(resumes_router,  prefix=API_PREFIX, tags=["Resumes"])   # ✅ PHASE 4
     app.include_router(nlp_router,      prefix=API_PREFIX, tags=["NLP"])       # ✅ PHASE 5
     app.include_router(storage_router,  prefix=API_PREFIX, tags=["Storage"])   # ✅ PHASE 6
+    app.include_router(jobs_router,     prefix=API_PREFIX)                     # ✅ MODULE JOBS
 
     return app
 

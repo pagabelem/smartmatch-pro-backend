@@ -44,11 +44,8 @@ from app.modules.skills.skill_model import Skill  # noqa: F401, E402
 
 # Phase 6 — Storage (no model, just service)
 
-# Membre 2 models (uncomment when available)
-# from app.modules.jobs.job_model import Job
-# from app.modules.matching.recommendation_model import Recommendation
-# from app.modules.skill_gap.skill_gap_model import SkillGapResult
-# from app.modules.favorites.favorite_model import Favorite
+# ✅ Membre 2 — Jobs
+from app.modules.jobs.job_model import Job  # noqa: F401, E402
 
 # ── Alembic config object ─────────────────────────────────────────────────────
 config = context.config

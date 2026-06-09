@@ -1,3 +1,5 @@
+# app/shared/enums.py
+
 """
 shared/enums.py — All application-level enumerations.
 
@@ -98,6 +100,14 @@ class WorkMode(str, Enum):
     REMOTE   = "remote"
     HYBRID   = "hybrid"
     ANY      = "any"
+
+
+class DegreeLevel(str, Enum):
+    """Required educational level for a job offer."""
+    BAC_2 = "Bac+2"
+    BAC_3 = "Bac+3"
+    BAC_5 = "Bac+5"
+    ANY   = "any"
 
 
 # ── Skills ────────────────────────────────────────────────────────────────────
