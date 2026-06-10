@@ -1,17 +1,5 @@
 """
 alembic/env.py — Alembic migration environment.
-
-Key points:
-- Imports Base from app.database so autogenerate can detect all models.
-- Imports every model module so their tables are registered on Base.metadata
-  BEFORE Alembic inspects it (models are only registered when imported).
-- Reads DATABASE_URL from app.config.settings (honours .env).
-- Supports both offline mode (generates SQL script) and online mode (runs on DB).
-
-Usage:
-    alembic revision --autogenerate -m "create users table"
-    alembic upgrade head
-    alembic downgrade -1
 """
 
 import sys
@@ -32,40 +20,27 @@ from app.config import settings  # noqa: E402
 # ── Import Base FIRST, then every model module ────────────────────────────────
 from app.database import Base  # noqa: E402
 
-# Phase 0-3 models (always import)
+# Membre 1 models
 from app.modules.users.user_model import Profile, User  # noqa: F401, E402
-from app.modules.auth.auth_model import RefreshToken  # noqa: F401, E402
+from app.modules.auth.auth_model import RefreshToken    # noqa: F401, E402
+from app.modules.resumes.resume_model import Resume     # noqa: F401, E402
+from app.modules.skills.skill_model import Skill        # noqa: F401, E402
 
-# ✅ PHASE 4 — Resumes
-from app.modules.resumes.resume_model import Resume  # noqa: F401, E402
-
-# ✅ PHASE 5 — Skills + NLP
-from app.modules.skills.skill_model import Skill  # noqa: F401, E402
-
-# Phase 6 — Storage (no model, just service)
-
-# ✅ Membre 2 — Jobs
-from app.modules.jobs.job_model import Job  # noqa: F401, E402
+# ✅ Membre 2 models
+from app.modules.jobs.job_model import Job              # noqa: F401, E402
+from app.modules.imports.import_model import Import     # noqa: F401, E402
 
 # ── Alembic config object ─────────────────────────────────────────────────────
 config = context.config
-
-# Override the sqlalchemy.url from alembic.ini with the value from .env
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
-# Interpret the config file for Python logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Metadata object that Alembic will compare against the current DB schema
 target_metadata = Base.metadata
 
 
-# ── Offline mode — generate a SQL script without connecting ──────────────────
 def run_migrations_offline() -> None:
-    """
-    Run migrations in 'offline' mode.
-    """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -79,11 +54,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-# ── Online mode — connect to the database and apply migrations ────────────────
 def run_migrations_online() -> None:
-    """
-    Run migrations in 'online' mode.
-    """
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -101,7 +72,6 @@ def run_migrations_online() -> None:
             context.run_migrations()
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
 if context.is_offline_mode():
     run_migrations_offline()
 else:

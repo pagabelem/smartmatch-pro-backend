@@ -29,21 +29,23 @@ from app.core.exceptions import (
 from app.modules.users.user_model import Profile, User          # noqa: F401
 from app.modules.auth.auth_model import RefreshToken            # noqa: F401
 from app.modules.skills.skill_model import Skill                # noqa: F401
-from app.modules.resumes.resume_model import Resume             # noqa: F401   ✅ PHASE 4
-from app.modules.jobs.job_model import Job                      # noqa: F401   ✅ MODULE JOBS
+from app.modules.resumes.resume_model import Resume             # noqa: F401
+from app.modules.jobs.job_model import Job                      # noqa: F401
+from app.modules.imports.import_model import Import             # noqa: F401   ✅ MODULE IMPORTS
 
 # ── Import routers ────────────────────────────────────────────────────────────
 from app.modules.auth.auth_router import router as auth_router
 from app.modules.skills.skill_router import router as skills_router
 from app.modules.users.user_router import router as users_router
 from app.modules.profiles.profile_router import router as profiles_router
-from app.modules.resumes.resume_router import router as resumes_router          # ✅ PHASE 4
-from app.modules.nlp.nlp_router import router as nlp_router                    # ✅ PHASE 5
-from app.modules.storage.storage_router import router as storage_router         # ✅ PHASE 6
-from app.modules.jobs.job_router import router as jobs_router                  # ✅ MODULE JOBS
+from app.modules.resumes.resume_router import router as resumes_router
+from app.modules.nlp.nlp_router import router as nlp_router
+from app.modules.storage.storage_router import router as storage_router
+from app.modules.jobs.job_router import router as jobs_router
+from app.modules.imports.import_router import router as imports_router          # ✅ MODULE IMPORTS
 
 # ── Import NLP preload function ───────────────────────────────────────────────
-from app.modules.nlp.nlp_service import preload_nlp_model                      # ✅ PHASE 5
+from app.modules.nlp.nlp_service import preload_nlp_model
 
 API_PREFIX = "/api/v1"
 
@@ -61,7 +63,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print(f"    Database    : {settings.DATABASE_URL}")
     print(f"    Debug mode  : {settings.DEBUG}")
 
-    # Verify DB is reachable before accepting traffic
     if not check_db_connection():
         raise RuntimeError(
             f"Cannot connect to database: {settings.DATABASE_URL}\n"
@@ -69,7 +70,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
     print("    Database    : ✓ connection OK")
 
-    # ✅ PHASE 5 : Chargement du modèle NLP (spaCy) au démarrage
     preload_nlp_model()
 
     yield  # ← application is running
@@ -95,8 +95,6 @@ def create_app() -> FastAPI:
     )
 
     # ── Middlewares ────────────────────────────────────────────────────────────
-
-    # CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins_list,
@@ -105,7 +103,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Trusted Host (production uniquement)
     if settings.ENVIRONMENT == "production":
         app.add_middleware(
             TrustedHostMiddleware,
@@ -116,18 +113,18 @@ def create_app() -> FastAPI:
     app.add_exception_handler(AppException, app_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
 
-    # ── Routers ───────────────────────────────────────────────────────────────
-    # Chaque routeur a déjà son propre préfixe interne (ex: "/auth", "/users"…)
-    # On ajoute uniquement le préfixe global /api/v1 ici.
-
+    # ── Routers Membre 1 ──────────────────────────────────────────────────────
     app.include_router(auth_router,     prefix=API_PREFIX, tags=["Authentication"])
     app.include_router(skills_router,   prefix=API_PREFIX, tags=["Skills"])
     app.include_router(users_router,    prefix=API_PREFIX, tags=["Users"])
     app.include_router(profiles_router, prefix=API_PREFIX, tags=["Profiles"])
-    app.include_router(resumes_router,  prefix=API_PREFIX, tags=["Resumes"])   # ✅ PHASE 4
-    app.include_router(nlp_router,      prefix=API_PREFIX, tags=["NLP"])       # ✅ PHASE 5
-    app.include_router(storage_router,  prefix=API_PREFIX, tags=["Storage"])   # ✅ PHASE 6
-    app.include_router(jobs_router,     prefix=API_PREFIX)                     # ✅ MODULE JOBS
+    app.include_router(resumes_router,  prefix=API_PREFIX, tags=["Resumes"])
+    app.include_router(nlp_router,      prefix=API_PREFIX, tags=["NLP"])
+    app.include_router(storage_router,  prefix=API_PREFIX, tags=["Storage"])
+
+    # ── Routers Membre 2 ──────────────────────────────────────────────────────
+    app.include_router(jobs_router,     prefix=API_PREFIX, tags=["Jobs — Offres d'emploi"])
+    app.include_router(imports_router,  prefix=API_PREFIX, tags=["Imports — Chargement de données en masse"])
 
     return app
 
