@@ -42,6 +42,8 @@ from app.modules.imports.import_router import router as imports_router
 from app.modules.favorites.favorite_router import router as favorites_router
 from app.modules.matching.matching_router import router as matching_router
 from app.modules.skill_gap.skill_gap_router import router as skill_gap_router
+from app.modules.dashboard.dashboard_router import router as dashboard_router
+from app.modules.ai.ai_router import router as ai_router
 
 from app.modules.nlp.nlp_service import preload_nlp_model
 
@@ -113,6 +115,8 @@ def create_app() -> FastAPI:
     app.include_router(favorites_router,  prefix=API_PREFIX, tags=["Favorites — Offres en favoris"])
     app.include_router(matching_router,   prefix=API_PREFIX, tags=["Matching"])
     app.include_router(skill_gap_router,  prefix=API_PREFIX, tags=["Skill Gap"])
+    app.include_router(dashboard_router,  prefix=API_PREFIX, tags=["Dashboard"])
+    app.include_router(ai_router,         prefix=API_PREFIX, tags=["IA — Intelligence Artificielle"])
 
     return app
 
