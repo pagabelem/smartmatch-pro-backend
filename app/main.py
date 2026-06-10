@@ -19,13 +19,14 @@ from app.core.exceptions import (
 )
 
 # ── Import all models ─────────────────────────────────────────────────────────
-from app.modules.users.user_model import Profile, User          # noqa: F401
-from app.modules.auth.auth_model import RefreshToken            # noqa: F401
-from app.modules.skills.skill_model import Skill                # noqa: F401
-from app.modules.resumes.resume_model import Resume             # noqa: F401
-from app.modules.jobs.job_model import Job                      # noqa: F401
-from app.modules.imports.import_model import Import             # noqa: F401
-from app.modules.favorites.favorite_model import Favorite       # noqa: F401
+from app.modules.users.user_model import Profile, User                      # noqa: F401
+from app.modules.auth.auth_model import RefreshToken                        # noqa: F401
+from app.modules.skills.skill_model import Skill                            # noqa: F401
+from app.modules.resumes.resume_model import Resume                         # noqa: F401
+from app.modules.jobs.job_model import Job                                  # noqa: F401
+from app.modules.imports.import_model import Import                         # noqa: F401
+from app.modules.favorites.favorite_model import Favorite                   # noqa: F401
+from app.modules.matching.recommendation_model import Recommendation        # noqa: F401
 
 # ── Import routers ────────────────────────────────────────────────────────────
 from app.modules.auth.auth_router import router as auth_router
@@ -38,6 +39,7 @@ from app.modules.storage.storage_router import router as storage_router
 from app.modules.jobs.job_router import router as jobs_router
 from app.modules.imports.import_router import router as imports_router
 from app.modules.favorites.favorite_router import router as favorites_router
+from app.modules.matching.matching_router import router as matching_router
 
 from app.modules.nlp.nlp_service import preload_nlp_model
 
@@ -107,6 +109,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router,      prefix=API_PREFIX, tags=["Jobs — Offres d'emploi"])
     app.include_router(imports_router,   prefix=API_PREFIX, tags=["Imports — Chargement de données en masse"])
     app.include_router(favorites_router, prefix=API_PREFIX, tags=["Favorites — Offres en favoris"])
+    app.include_router(matching_router,  prefix=API_PREFIX, tags=["Matching"])
 
     return app
 
@@ -130,3 +133,4 @@ def health_check() -> JSONResponse:
 @app.get("/", include_in_schema=False)
 def root():
     return RedirectResponse(url="/docs")
+    
